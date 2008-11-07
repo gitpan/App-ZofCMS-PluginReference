@@ -1,6 +1,6 @@
 ---
 name: App-ZofCMS-PluginReference
-version: 0.0101
+version: 0.0102
 author:
   - "Zoffix <'zoffix@cpan.org'>"
 abstract: docs for all plugins in one document for easy reference
@@ -12,7 +12,7 @@ build_requires:
 provides:
   App::ZofCMS::PluginReference:
     file: lib/App/ZofCMS/PluginReference.pm
-    version: 0.0101
+    version: 0.0102
 generated_by: Module::Build version 0.2808
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.2.html
