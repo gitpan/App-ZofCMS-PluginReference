@@ -3,7 +3,7 @@ package App::ZofCMS::PluginReference;
 use warnings;
 use strict;
 
-our $VERSION = '0.0103';
+our $VERSION = '0.0104';
 
 
 1;
@@ -1152,7 +1152,7 @@ thus the result will be:
 That's all there is to it, enjoy!
 
 
-=head1 App::ZofCMS::Plugin::DBI (version 0.0202)
+=head1 App::ZofCMS::Plugin::DBI (version 0.0311)
 
 NAME
 
@@ -1285,6 +1285,10 @@ C<dbi_get>
             layout  => [ qw/name pass/ ],
             single  => 1,
             sql     => [ 'SELECT * FROM test' ],
+            on_data => 'has_data',
+            process => sub {
+                my ( $data_ref, $template, $query, $config ) = @_;
+            }
         },
     }
 
@@ -1378,6 +1382,44 @@ create the C<name> key with data from the database. C<cell> must point
 to a key with a hashref in it (though, keep autovivification in mind).
 Possibly the sane values for this are either C<t> or C<d>. B<Defaults to:>
 C<t> (the data will be available in your L<HTML::Template> templates)
+
+C<on_data>
+
+    dbi_get => {
+        on_data => 'has_data',
+    ...
+
+B<Optional>. Takes a string as an argument. When specified will set the key in C<{t}> name of
+which is specified C<on_data> to C<1> when there are any rows that were selected. Typical
+usage for this would be to display some message if no data is available; e.g.:
+
+    dbi_get => {
+        layout => [ qw/name last_name/ ],
+        sql => [ 'SELECT * FROM users' ],
+        on_data => 'has_users',
+    },
+
+    <tmpl_if name="has_users">
+        <p>Here are the users:</p>
+        <!-- display data here -->
+    <tmpl_else>
+        <p>I have no users for you</p>
+    </tmpl_if>
+
+C<process>
+
+    dbi_get => {
+        process => sub {
+            my ( $data_ref, $template, $query, $config ) = @_;
+            # do stuff
+        }
+    ...
+
+B<Optional>. Takes a subref as a value. When specified the sub will be executed right after
+the data is fetched. The C<@_> will contain the following (in that order):
+C<$data_ref> - the return of L<DBI>'s C<selectall_arrayref> call, this may have other
+options later on when more methods are supported, the ZofCMS Template hashref, query
+hashref and L<App::ZofCMS::Config> object.
 
 C<dbi_set>
 
@@ -2571,7 +2613,7 @@ The C<upload_filename> will be set to directory + name + extension of the
 local file into which the upload was saved.
 
 
-=head1 App::ZofCMS::Plugin::FormChecker (version 0.0301)
+=head1 App::ZofCMS::Plugin::FormChecker (version 0.0312)
 
 NAME
 
@@ -2612,6 +2654,14 @@ In ZofCMS template or main config file:
         },
     },
 
+In your L<HTML::Template> template:
+
+    <tmpl_if name="plug_form_checker_error">
+        <p class="error"><tmpl_var name="plug_form_checker_error"></p>
+    </tmpl_if>
+
+    <form ......
+
 DESCRIPTION
 
 The module is a plugin for L<App::ZofCMS> that provides nifteh form checking.
@@ -2638,6 +2688,7 @@ C<plug_form_checker>
         trigger     => 'plug_form_checker',
         ok_key      => 'd',
         ok_redirect => '/some-page',
+        fail_code   => sub { die "Not ok!" },
         ok_code     => sub { die "All ok!" },
         no_fill     => 1,
         fill_prefix => 'plug_form_q_',
@@ -2680,10 +2731,10 @@ C<ok_key>
     ok_key => 'd',
 
 B<Optional>. If the form passed all the checks plugin will set a B<second level>
-key C<plug_form_checker> to a true value. The C<ok_key> parameter specifies the
+key C<plug_form_checker_ok> to a true value. The C<ok_key> parameter specifies the
 B<first level> key in ZofCMS template where to put the C<plug_form_checker> key. For example,
 you can set C<ok_key> to C<'t'> and then in your L<HTML::Template> template use
-C<< <tmpl_if name="plug_form_checker">FORM OK!</tmpl_if> >>... but, beware of using
+C<< <tmpl_if name="plug_form_checker_ok">FORM OK!</tmpl_if> >>... but, beware of using
 the C<'t'> key when you are also using L<App::ZofCMS::QueryToTemplate> plugin, as someone
 could avoid proper form checking by passing fake query parameter. B<Defaults to:>
 C<d> ("data" ZofCMS template special key).
@@ -2708,6 +2759,20 @@ form passes all the checks. The C<@_> will contain the following (in that order)
 hashref of ZofCMS Template, hashref of query parameters and L<App::ZofCMS::Config> object.
 B<By default> is not specified. Note: if you specify C<ok_code> B<and> C<ok_redirect> the
 code will be executed and only then user will be redirected.
+
+C<fail_code>
+
+    fail_code => sub {
+        my ( $template, $query, $config, $error ) = @_;
+        $template->{t}{foo} = "We got an error: $error";
+    }
+
+B<Optional>. Takes a subref as a value. When specfied that subref will be executed if the
+form fails any of the checks. The C<@_> will contain the following (in that order):
+hashref of ZofCMS Template, hashref of query parameters, L<App::ZofCMS::Config> object and
+the scalar contain the error that would also go into C<{t}{plug_form_checker_error}> in
+ZofCMS template.
+B<By default> is not specified.
 
 C<no_fill>
 
@@ -5774,9 +5839,6 @@ NOTES ON TESTING
 The W3C validator cannot validate pages that are not publicly accessible, i.e. (possibly) your
 development server; thus clicking the links from your local version of site will make
 the validator error out.
-
-
-
 
 =head1 AUTHOR
 
