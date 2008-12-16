@@ -3,7 +3,7 @@ package App::ZofCMS::PluginReference;
 use warnings;
 use strict;
 
-our $VERSION = '0.0104';
+our $VERSION = '0.0105';
 
 
 1;
@@ -346,6 +346,158 @@ Finally, the C<$config> is L<App::ZofCMS::Config> object.
 MOAR!
 
 Feel free to email me the requests for extra functionality for this base class.
+
+
+=head1 App::ZofCMS::Plugin::BasicLWP (version 0.0102)
+
+NAME
+
+
+Link: L<App::ZofCMS::Plugin::BasicLWP>
+
+
+
+App::ZofCMS::Plugin::BasicLWP - very basic "uri-to-content" style LWP plugin for ZofCMS.
+
+SYNOPSIS
+
+In your ZofCMS Template or Main Config File:
+
+    plugins => [ qw/BasicLWP/ ],
+    plug_basic_lwp => {
+        t_key   => 't',
+        uri     => 'http://zofdesign.com/'
+    },
+
+In your L<HTML::Template> template:
+
+    <div id="funky_iframe">
+        <tmpl_if name='plug_basic_lwp_error'>
+            <p>Error fetching content: <tmpl_var name='plug_basic_lwp_error'></p>
+        <tmpl_else>
+            <tmpl_var name='plug_basic_lwp'>
+        </tmpl_if>
+    </div>
+
+DESCRIPTION
+
+The module is a plugin for L<App::ZofCMS>. It provides basic functionality to fetch a random
+URI with L<LWP::UserAgent> and stick the content into ZofCMS Template hashref.
+
+This documentation assumes you've read L<App::ZofCMS>, L<App::ZofCMS::Config> and L<App::ZofCMS::Template>
+
+MAIN CONFIG FILE AND ZofCMS TEMPLATE FIRST-LEVEL KEYS
+
+C<plugins>
+
+    plugins => [ qw/BasicLWP/ ],
+
+You need to add the plugin to the list of plugins to execute. Since you are likely to work
+on the fetched data, make sure to set correct priorities.
+
+C<plug_basic_lwp>
+
+    plug_basic_lwp => {
+        uri     => 'http://zofdesign.com/', # everything but 'uri' is optional
+        t_name  => 'plug_basic_lwp',
+        t_key   => 'd',
+        decoded => 0,
+        fix_uri => 0,
+        ua_args => [
+            agent   => 'Opera 9.2',
+            timeout => 30,
+        ],
+    }
+
+The plugin won't run unless C<plug_basic_lwp> first-level key is present either in Main
+Config File or ZofCMS Template. Takes a hashref as a value. If the same keys are specified
+in both Main Config File and ZofCMS Template, then the value set in ZofCMS template will
+take precedence. The possible keys/values of that hashref are as follows:
+
+C<uri>
+
+    uri => 'http://zofdesign.com/',
+
+    uri => sub {
+        my ( $template, $query, $config ) = @_;
+        return $query->{uri_to_fetch};
+    }
+
+    uri => URI->new('http://zofdesign.com/');
+
+B<Mandatory>. Takes a string, subref or L<URI> object as a value. Specifies the URI to fetch.
+When value is a subref that subref will be executed and its return value will be given to
+C<uri> argument. Subref's C<@_> will contain the following (in that order): ZofCMS Template hashref, hashref of query parameters and L<App::ZofCMS::Config> object. B<Plugin will stop>
+if the C<uri> is undefined; that also means that you can return an C<undef> from your subref
+to stop processing.
+
+C<t_name>
+
+    t_name => 'plug_basic_lwp',
+
+B<Optional>. See also C<t_key> parameter below.
+Takes a string as a value. This string represents the name of the key in
+ZofCMS Template where to put the fetched content (or error). B<Note:> the errors will
+be indicated by C<$t_name . '_error'> L<HTML::Template> variable, where C<$t_name> is the value
+of C<t_name> argument.
+See SYNOPSYS for examples. B<Defaults to:> C<plug_basic_lwp> (and
+the errors will be in C<plug_basic_lwp_error>
+
+C<t_key>
+
+    t_key => 'd',
+
+B<Optional>. Takes a string as a value. Specifies the name of B<first-level> key in ZofCMS
+Template hashref in which to create the C<t_name> key (see above). B<Defaults to:> C<d>
+
+C<decoded>
+
+    decoded => 0,
+
+B<Optional>. Takes either true or false values as a value. When set to a I<true> value,
+the content will be given us with C<decoded_content()>. When set to a I<false> value, the
+content will be given us with C<content()> method. See L<HTTP::Response> for description
+of those two methods. B<Defaults to:> C<0> (use C<content()>)
+
+C<fix_uri>
+
+    fix_uri => 0,
+
+B<Optional>. Takes either true or false values as a value. When set to a true value, the
+plugin will try to "fix" URIs that would cause LWP to crap out with "URI must be absolute"
+errors. When set to a false value, will attempt to fetch the URI as it is. B<Defaults to:>
+C<0> (fixing is disabled)
+
+B<Note:> the "fixer" is not that smart, here's the code; feel free not to use it :)
+
+    $uri = "http://$uri"
+        unless $uri =~ m{^(ht|f)tp://}i;
+
+C<ua_args>
+
+    ua_args => [
+        agent   => 'Opera 9.2',
+        timeout => 30,
+    ],
+
+B<Optional>. Takes an arrayref as a value. This arrayref will be directly dereference into
+L<LWP::UserAgent> contructor. See L<LWP::UserAgent>'s documentation for possible values.
+B<Defaults to:>
+
+    [
+        agent   => 'Opera 9.2',
+        timeout => 30,
+    ],
+
+HTML::Template VARIABLES
+
+The code below assumes default values for C<t_name> and C<t_key> arguments (see C<plug_basic_lwp> hashref keys' description).
+
+    <tmpl_if name='plug_basic_lwp_error'>
+        <p>Error fetching content: <tmpl_var name='plug_basic_lwp_error'></p>
+    <tmpl_else>
+        <tmpl_var name='plug_basic_lwp'>
+    </tmpl_if>
 
 
 =head1 App::ZofCMS::Plugin::BreadCrumbs (version 0.0102)
@@ -1152,7 +1304,363 @@ thus the result will be:
 That's all there is to it, enjoy!
 
 
-=head1 App::ZofCMS::Plugin::DBI (version 0.0311)
+=head1 App::ZofCMS::Plugin::DateSelector (version 0.0112)
+
+NAME
+
+
+Link: L<App::ZofCMS::Plugin::DateSelector>
+
+
+
+App::ZofCMS::Plugin::DateSelector - plugin to generate and "parse" <select>s for date/time input
+
+SYNOPSIS
+
+In ZofCMS Template or Main Config File
+
+    # the Sub plugin is used only for demonstration here
+
+    plugins => [ { DateSelector => 2000 }, { Sub => 3000 } ],
+
+    plug_date_selector => {
+        class           => 'date_selector',
+        id              => 'date_selector',
+        q_name          => 'date',
+        t_name          => 'date_selector',
+        start           => time() - 30000000,
+        end             => time() + 30000000,
+        interval_step   => 'minute',
+        interval_max    => 'year',
+    },
+
+    plug_sub => sub {
+        my $t = shift;
+        $t->{t}{DATE} = "[$t->{d}{date_selector}{localtime}]";
+    },
+
+In L<HTML::Template> template:
+
+    <form...
+
+        <label for="date_selector">When: </label><tmpl_var name="date_selector">
+
+    .../form>
+
+    <tmpl_if name="DATE">
+        <p>You selected: <tmpl_var name="DATE"></p>
+    <tmpl_else>
+        <p>You did not select anything yet</p>
+    </tmpl_if>
+
+DESCRIPTION
+
+The module is a plugin for L<App::ZofCMS> that provides means to generate several
+C<< <select> >> elements for date and time selection by the user. Plugin also provides means
+to "parse" those C<< <select> >>s from the query to generate either epoch time, same string
+as C<localtime()> or access each selection individually from a hashref.
+
+This documentation assumes you've read L<App::ZofCMS>, L<App::ZofCMS::Config> and L<App::ZofCMS::Template>
+
+FIRST-LEVEL ZofCMS TEMPLATE AND MAIN CONFIG FILE KEYS
+
+C<plugins>
+
+    plugins => [ qw/DateSelector/ ],
+
+You obviously need to add the plugin to the list of plugins to execute. The plugin does not
+provide any input checking and sticks the "parse" of query into the C<{d}> special key in
+ZofCMS Template, thus you'd very likely to use this plugin in combination with some other
+plugin.
+
+C<plug_date_selector>
+
+    plug_date_selector => {
+        class           => 'date_selector',
+        id              => 'date_selector',
+        q_name          => 'date',
+        t_name          => 'date_selector',
+        d_name          => 'date_selector',
+        start           => time() - 30000000,
+        end             => time() + 30000000,
+        interval_step   => 'minute',
+        interval_max    => 'year',
+    }
+
+    plug_date_selector => [
+        {
+            class           => 'date_selector1',
+            id              => 'date_selector1',
+            q_name          => 'date1',
+            t_name          => 'date_selector1',
+            d_name          => 'date_selector1',
+        },
+        {
+            class           => 'date_selector2',
+            id              => 'date_selector2',
+            q_name          => 'date2',
+            t_name          => 'date_selector2',
+            d_name          => 'date_selector2',
+        }
+    ]
+
+Plugin will not run unless C<plug_date_selector> first-level key is specified in either
+ZofCMS Template or Main Config File. When specified in both, ZofCMS Template and Main Config
+File, then the value set in ZofCMS Template takes precedence. To use the plugin with all
+of its defaults use C<< plug_date_selector => {} >>
+
+The C<plug_date_selector> key takes either hashref or an arrayref as a value. If the value
+is a hashref, it is the same as specifying an arrayref with just that hashref in it. Each
+hashref represents a separate "date selector", i.e. a set of C<< <select> >> elements for
+date selection. The possible keys/values of each of those hashrefs are as follows:
+
+C<class>
+
+    class => 'date_selector',
+
+B<Optional>. Specifies the C<class=""> attribute to stick on every generated C<< <select> >>
+element in the date selector. B<Defaults to:> C<date_selector>
+
+C<id>
+
+    id => 'date_selector',
+
+B<Optional>. Specifies the C<id=""> attribute to stick on the B<first> generated
+C<< <select> >> element in the date selector. B<By default> is not specified, i.e. no C<id="">
+will be added.
+
+C<q_name>
+
+    q_name => 'date',
+
+B<Optional>. Specifies the "base" B<q>uery parameter name for generated C<< <select> >>
+elements.
+Each of those elements will have its C<name=""> attribute made from C<$q_name . '_' . $type>,
+where C<$q_name> is the value of C<q_name> key and C<$type> is the type of the
+C<< <select> >>, the types are as follows: C<year>, C<month>, C<day>, C<hour>, C<minute>
+and C<second>. B<Defaults to:> C<date>
+
+C<t_name>
+
+    t_name => 'date_selector',
+
+B<Optional>. Specifies the name of the key in C<{t}> ZofCMS Template special key where to
+stick HTML code for generated C<< <select> >>s. B<Defaults to:> C<date_selector>, thus you'd
+use C<< <tmpl_var name='date_selector'> >> to insert HTML code.
+
+C<d_name>
+
+    d_name => 'date_selector',
+
+B<Optional>. If plugin sees that the query contains B<all> of the parameters from a given
+"date selector", then it will set the C<d_name> key in C<{d}> ZofCMS Template special key
+with a hashref that contains three keys:
+
+    $VAR1 = {
+        'time' => 1181513455,
+        'localtime' => 'Sun Jun 10 18:10:55 2007',
+        'bits' => {
+            'hour' => '18',
+            'minute' => '10',
+            'second' => 55,
+            'month' => '5',
+            'day' => '10',
+            'year' => 107
+        }
+    };
+
+C<time>
+
+    'time' => 1181513455,
+
+The C<time> key will contain the epoch time of the date that user selected (i.e. as C<time()>
+would output).
+
+C<localtime>
+
+    'localtime' => 'Sun Jun 10 18:10:55 2007',
+
+The C<localtime> key will contain the "date string" of the selected date (i.e. output of
+C<localtime()>).
+
+C<bits>
+
+    'bits' => {
+        'hour' => '18',
+        'minute' => '10',
+        'second' => 55,
+        'month' => '5',
+        'day' => '10',
+        'year' => 107
+    }
+
+The C<bits> key will contain a B<hashref>, with individual "bits" of the selected date. The
+"bits" are keys in the hashref and are as follows: year, month, day, hour, minute and second.
+If your date selector's range does not cover all the values (e.g. has only month and day)
+(see C<interval_step> and C<interval_max> options below) then the B<missing values> will
+be taken from the output of C<localtime()>. The values of each of these "bits" are in
+the same format as C<localtime()> would give them to you, i.e. to get the full year you'd
+do bits->{year} + 1900.
+
+C<start>
+
+    start => time() - 30000000,
+
+B<Optional>. The plugin will generate values for C<< <select> >> elements to cover a certain
+period of time. The C<start> and C<end> (see below) parameters take the number of seconds
+from epoch (i.e. same as return of C<time()>) as values and C<start> indicates the start
+of the period to cover and C<end> indicates the end of the time period to cover. B<Defaults
+to:> C<time() - 30000000>
+
+C<end>
+
+    end => time() + 30000000,
+
+B<Optional>. See description of C<start> right above. B<Defaults to:> C<time() + 30000000>
+
+C<interval_step>
+
+    interval_step   => 'minute',
+
+B<Optional>. Specifies the "step", or the minimum unit of time the user would be able to
+select. Valid values (all lowercase) are as follows: C<year>, C<month>, C<day>, C<hour>,
+C<minute> and C<second>. B<Defaults to:> C<minute>
+
+C<interval_max>
+
+    interval_max => 'year',
+
+B<Optional>. Specifies the maximum unit of time the user would be able to select.
+Valid values (all lowercase) are as follows: C<year>, C<month>, C<day>, C<hour>,
+C<minute> and C<second>. B<Defaults to:> C<year>
+
+C<minute_step>
+
+    minute_step => 5,
+
+B<Optional>. Specifies the "step" of minutes to display, in other words, when C<minute_step>
+is set to C<10>, then in the "minutes" C<< <select> >>
+the plugin will generate only C<< <option> >>s 0, 10, 20, 30, 40 and 50. B<Defaults to:>
+C<5> (increments of 5 minutes).
+
+C<second_step>
+
+    second_step => 10,
+
+B<Optional>. Specifies the "step" of seconds to display, in other words, when C<second_step>
+is set to C<10>, then in the "minutes" C<< <select> >>
+the plugin will generate only C<< <option> >>s 0, 10, 20, 30, 40 and 50. B<Defaults to:>
+C<5> (increments of 5 minutes).
+
+HTML::Template VARIABLES
+
+See description of C<t_name> argument above. The value of C<t_name> specifies the name
+of the C<< <tmpl_var name=""> >> plugin will generate. Note that there could be several of
+these of you are generating several date selectors.
+
+GENERATED HTML CODE
+
+The following is a sample of the generated code with all the defaults left intact:
+
+    <select name="date_year" class="date_selector">
+        <option value="107" selected>2007</option>
+        <option value="108">2008</option>
+        <option value="109">2009</option>
+    </select>
+
+    <select name="date_month" class="date_selector">
+        <option value="0" selected>January</option>
+        <option value="1">February</option>
+        <option value="2">March</option>
+        <option value="3">April</option>
+        <option value="4">May</option>
+        <option value="5">June</option>
+        <option value="6">July</option>
+        <option value="7">August</option>
+        <option value="8">September</option>
+        <option value="9">October</option>
+        <option value="10">November</option>
+        <option value="11">December</option>
+    </select>
+
+    <select name="date_day" class="date_selector">
+        <option value="1" selected>Day: 1</option>
+        <option value="2">Day: 2</option>
+        <option value="3">Day: 3</option>
+        <option value="4">Day: 4</option>
+        <option value="5">Day: 5</option>
+        <option value="6">Day: 6</option>
+        <option value="7">Day: 7</option>
+        <option value="8">Day: 8</option>
+        <option value="9">Day: 9</option>
+        <option value="10">Day: 10</option>
+        <option value="11">Day: 11</option>
+        <option value="12">Day: 12</option>
+        <option value="13">Day: 13</option>
+        <option value="14">Day: 14</option>
+        <option value="15">Day: 15</option>
+        <option value="16">Day: 16</option>
+        <option value="17">Day: 17</option>
+        <option value="18">Day: 18</option>
+        <option value="19">Day: 19</option>
+        <option value="20">Day: 20</option>
+        <option value="21">Day: 21</option>
+        <option value="22">Day: 22</option>
+        <option value="23">Day: 23</option>
+        <option value="24">Day: 24</option>
+        <option value="25">Day: 25</option>
+        <option value="26">Day: 26</option>
+        <option value="27">Day: 27</option>
+        <option value="28">Day: 28</option>
+        <option value="29">Day: 29</option>
+        <option value="30">Day: 30</option>
+        <option value="31">Day: 31</option>
+    </select>
+
+    <select name="date_hour" class="date_selector">
+        <option value="0" selected>Hour: 0</option>
+        <option value="1">Hour: 1</option>
+        <option value="2">Hour: 2</option>
+        <option value="3">Hour: 3</option>
+        <option value="4">Hour: 4</option>
+        <option value="5">Hour: 5</option>
+        <option value="6">Hour: 6</option>
+        <option value="7">Hour: 7</option>
+        <option value="8">Hour: 8</option>
+        <option value="9">Hour: 9</option>
+        <option value="10">Hour: 10</option>
+        <option value="11">Hour: 11</option>
+        <option value="12">Hour: 12</option>
+        <option value="13">Hour: 13</option>
+        <option value="14">Hour: 14</option>
+        <option value="15">Hour: 15</option>
+        <option value="16">Hour: 16</option>
+        <option value="17">Hour: 17</option>
+        <option value="18">Hour: 18</option>
+        <option value="19">Hour: 19</option>
+        <option value="20">Hour: 20</option>
+        <option value="21">Hour: 21</option>
+        <option value="22">Hour: 22</option>
+        <option value="23">Hour: 23</option>
+    </select>
+
+    <select name="date_minute" class="date_selector">
+        <option value="0" selected>Minute: 00</option>
+        <option value="5">Minute: 05</option>
+        <option value="10">Minute: 10</option>
+        <option value="15">Minute: 15</option>
+        <option value="20">Minute: 20</option>
+        <option value="25">Minute: 25</option>
+        <option value="30">Minute: 30</option>
+        <option value="35">Minute: 35</option>
+        <option value="40">Minute: 40</option>
+        <option value="45">Minute: 45</option>
+        <option value="50">Minute: 50</option>
+        <option value="55">Minute: 55</option>
+    </select>
+
+
+=head1 App::ZofCMS::Plugin::DBI (version 0.0312)
 
 NAME
 
@@ -1315,10 +1823,15 @@ C<layout>
 
     layout  => [ qw/name pass time info/ ],
 
-B<Mandatory>. Takes an arrayref as an argument.
+B<Optional>. Takes an arrayref as an argument.
 Specifies the name of C<< <tmpl_var name=""> >>s in your
 C<< <tmpl_loop> >> (see C<type> argument below) to which map the columns
-retrieved from the database, see C<SYNOPSIS> section above.
+retrieved from the database, see C<SYNOPSIS> section above. If the second element in your
+C<sql> arrayref is a hashref with a key C<Slice> whose value is a hashref, then C<layout>
+specifies which keys to keep, since C<selectall_arrayref()> (the only currently supported
+method) will return an arrayref of hashrefs where keys are column names and values are
+the values. Not specifying C<layout> is only allowed when C<Slice> is a hashref and in that
+case all column names will be kept. B<By default> is not specified.
 
 C<sql>
 
@@ -2355,7 +2868,7 @@ NON-CORE PREREQUISITES
 The plugin requires one non-core module: L<Data::Transformer>
 
 
-=head1 App::ZofCMS::Plugin::FileUpload (version 0.0101)
+=head1 App::ZofCMS::Plugin::FileUpload (version 0.0111)
 
 NAME
 
@@ -2613,7 +3126,249 @@ The C<upload_filename> will be set to directory + name + extension of the
 local file into which the upload was saved.
 
 
-=head1 App::ZofCMS::Plugin::FormChecker (version 0.0312)
+=head1 App::ZofCMS::Plugin::FloodControl (version 0.0101)
+
+NAME
+
+
+Link: L<App::ZofCMS::Plugin::FloodControl>
+
+
+
+App::ZofCMS::Plugin::FloodControl - plugin for protecting forms and anything else from floods (abuse)
+
+SYNOPSIS
+
+In your Main Config File or ZofCMS Template file:
+
+    plug_flood_control => {
+        dsn             => "DBI:mysql:database=test;host=localhost",
+        user            => 'test',
+        pass            => 'test',
+        # everything below is optional
+        opt             => { RaiseError => 1, AutoCommit => 1 }, 
+        create_table    => 0, 
+        limit           => 2,
+        timeout         => 600,
+        table           => 'flood_control',
+        run             => 0,
+        trigger         => 'plug_flood',
+        cell            => 'q',
+        t_key           => 'plug_flood',
+        flood_id        => 'flood',
+        flood_code      => sub {
+            my ( $template, $query, $config ) = @_;
+            kill_damn_flooders();
+        },
+        no_flood_code   => sub {
+            my ( $template, $query, $config ) = @_;
+            hug_the_user();
+        },
+    }
+
+In your L<HTML::Template> Template:
+
+    <tmpl_if name='plug_flood'>
+        STOP FLOODING, ASSHOLE!
+    <tmpl_else>
+        <form ....
+        .../form>
+    </tmpl_if>
+
+Plugin needs an SQL table to operate. You can either create it by hand or set the
+C<create_table> option to a true value once so plugin could create the table automatically.
+The needed table needs to have these three columns:
+
+    CREATE TABLE flood_table (host VARCHAR(250), time VARCHAR(10), id VARCHAR(5));
+
+The value type of the C<id> column can be different depending on what C<flood_id> arguments
+you'd use (see docs below for more).
+
+DESCRIPTION
+
+The module is a plugin for L<App::ZofCMS>. It provides means to detect flood (abuse) and
+react accordingly depending on whether or not flood was detected.
+
+This documentation assumes you've read L<App::ZofCMS>, L<App::ZofCMS::Config> and L<App::ZofCMS::Template>
+
+MAIN CONFIG FILE AND ZofCMS TEMPLATE FIRST-LEVEL KEYS
+
+C<plugins>
+
+    plugins => [ qw/FloodControl/ ],
+
+You obviously need to the add the plugin in the list of plugins to execute. Along with this
+plugin you would probably want to use something like L<App::ZofCMS::Plugin::FormChecker>
+and L<App::ZofCMS::Plugin::DBI>
+
+C<plug_flood_control>
+
+    plug_flood_control => {
+        dsn             => "DBI:mysql:database=test;host=localhost",
+        user            => 'test',
+        pass            => 'test',
+        # everything below is optional
+        opt             => { RaiseError => 1, AutoCommit => 1 }, 
+        create_table    => 0, 
+        limit           => 2,
+        timeout         => 600,
+        table           => 'flood_control',
+        run             => 0,
+        trigger         => 'plug_flood',
+        cell            => 'q',
+        t_key           => 'plug_flood',
+        flood_id        => 'flood',
+        flood_code      => sub {
+            my ( $template, $query, $config ) = @_;
+            kill_damn_flooders();
+        },
+        no_flood_code   => sub {
+            my ( $template, $query, $config ) = @_;
+            hug_the_user();
+        },
+    }
+
+Plugin uses C<plug_flood_control> first-level key that can be specified in either (or both)
+Main Config File or ZofCMS Template file. The key takes a hashref as a value. If the keys of
+that hashref are specified in both files will take their values from ZofCMS Template.
+Most of these keys are optional with sensible defaults. Possible keys/values are as follows:
+
+C<dsn>
+
+    dsn => "DBI:mysql:database=test;host=localhost",
+
+B<Mandatory>. Specifies the "DSN" for L<DBI> module. See L<DBI>'s docs for C<connect_cached()>
+method for more info on this one.
+
+C<user>
+
+    user => 'test',
+
+B<Mandatory>. Specifies your username for the SQL database.
+
+C<pass>
+
+    pass => 'test',
+
+B<Mandatory>. Specifies your password for the SQL database.
+
+C<opt>
+
+    opt => { RaiseError => 1, AutoCommit => 1 },
+
+B<Optional>. Takes a hashref as a value. Specifies the additional options for L<DBI>'s
+C<connect_cached()> method. See L<DBI>'s docs for C<connect_cached()>
+method for more info on this one. B<Defaults to:> C<< { RaiseError => 1, AutoCommit => 1 } >>
+
+C<table>
+
+    table => 'flood_control',
+
+B<Optional>. Takes a string as a value that represents the name of the table in which to
+store flood data. B<Defaults to:> C<flood_control>
+
+C<create_table>
+
+    create_table => 0,
+
+B<Optional>. Takes either true or false values. When set to a true value will automatically
+create the table that is needed for the plugin. You can create the table manually, its
+format is described in the C<SYNOPSIS> section above. B<Defaults to:> C<0>
+
+C<limit>
+
+    limit => 2,
+
+B<Optional>. Specifies the "flood limit". Takes a positive integer value that
+is the number of times the plugin will be
+triggered in C<timeout> (see below) seconds before it will think we are being abused.
+B<Defaults to:> C<2>
+
+C<timeout>
+
+    timeout => 600,
+
+B<Optional>. Takes a positive integer value. Specifies timeout in seconds after which
+the plugin will forget that a certain user triggered it. In other words, if the plugin is
+triggered when someone submits the form and C<timeout> is set to C<600> and C<limit> is set
+to C<2> then the user would be able to submit the form only twice every 10 minutes.
+B<Defaults to:> C<600>
+
+C<trigger>
+
+    trigger => 'plug_flood',
+
+B<Optional>. Takes a string as a value that names the key in a C<cell> (see below).
+Except for when the C<cell> is set to C<q>, the value referenced by the key must contain
+a true value in order for the plugin to trigger (to run). B<Defaults to:> C<plug_flood>
+
+C<cell>
+
+    cell => 'q',
+
+B<Optional>. The plugin can be triggered either from query, C<{t}> special key, C<{d}>
+ZofCMS Template special key, or any first-level ZofCMS Template key (also, see C<run>
+option below). The value of the C<cell> key specifies where the plugin will look for the
+C<trigger> (see above). Possible values for C<cell> key are: C<q> (query), C<d> (C<{d}> key),
+C<t> (C<{t}> key) or empty string (first-level ZofCMS Template key). For every C<cell> value
+but the C<q>, the trigger (i.e. the key referenced by the C<trigger> argument) must be set
+to a true value in order for the plugin to trigger. When C<cell> is set to value C<q>, then
+the query parameter referenced by C<trigger> must have C<length()> in order for the plugin
+to trigger. B<Defaults to:> C<q>
+
+C<run>
+
+    run => 0,
+
+B<Optional>. An alternative to using C<cell> and C<trigger> arguments you can set
+(e.g. dynamically with some other plugin) the C<run> argument to a true value. Takes
+either true or false values. When set to a true value plugin will "trigger" (check for floods)
+without any consideration to C<cell> and C<trigger> values. B<Defaults to:> C<0>
+
+C<t_key>
+
+    t_key => 'plug_flood',
+
+B<Optional>. If plugin sees that the user is flooding, it will set C<t_key> in ZofCMS Template
+C<{t}> special key. Thus you can display appropriate messages using C<< <tmpl_if name=""> >>.
+B<Defaults to:> C<plug_flood>
+
+C<flood_id>
+
+    flood_id => 'flood',
+
+B<Optional>. You can use the same table to control various pages or forms from flood
+independently by setting C<flood_id> to different values for each of them. B<Defaults to:>
+C<flood>
+
+C<flood_code>
+
+    flood_code => sub {
+        my ( $template, $query, $config ) = @_;
+        kill_damn_flooders();
+    },
+
+B<Optional>. Takes a subref as a value. This sub will be run if plugin thinks that the user
+is flooding. The C<@_> will contain (in that order) ZofCMS Template hashref, query parameters
+hashref where keys are params' names and values are their values and L<App::ZofCMS::Config>
+object. B<By default> is not specified.
+
+C<no_flood_code>
+
+    no_flood_code   => sub {
+        my ( $template, $query, $config ) = @_;
+        hug_the_user();
+    },
+
+B<Optional>. Takes a subref as a value. This is the opposite of C<flood_code>.
+This sub will be run if plugin thinks that the user
+is B<NOT> flooding.
+The C<@_> will contain (in that order) ZofCMS Template hashref, query parameters
+hashref where keys are params' names and values are their values and L<App::ZofCMS::Config>
+object. B<By default> is not specified.
+
+
+=head1 App::ZofCMS::Plugin::FormChecker (version 0.0331)
 
 NAME
 
@@ -2770,9 +3525,20 @@ C<fail_code>
 B<Optional>. Takes a subref as a value. When specfied that subref will be executed if the
 form fails any of the checks. The C<@_> will contain the following (in that order):
 hashref of ZofCMS Template, hashref of query parameters, L<App::ZofCMS::Config> object and
-the scalar contain the error that would also go into C<{t}{plug_form_checker_error}> in
-ZofCMS template.
+(if the C<all_errors> is set to a false value) the scalar contain the error that would
+also go into C<{t}{plug_form_checker_error}> in
+ZofCMS template; if C<all_errors> is set to a true value, than C<$error> will be an arrayref
+of hashrefs that have only one key - C<error>, value of which is the error message.
 B<By default> is not specified.
+
+C<all_errors>
+
+    all_errors => 1,
+
+B<Optional>. Takes either true or false values. When set to a false value plugin will
+stop processing as soon as it finds the first error and will report it to the user. When
+set to a true value will find all errors and report all of them; see C<HTML::Template
+VARIABLES> section below for samples. B<Defaults to:> C<0>
 
 C<no_fill>
 
@@ -2892,6 +3658,7 @@ Here is the list of all valid ruleset keys:
             name            => 'Parameter', # the name of this param to use in error messages
             num             => 1, # value must be numbers-only
             optional        => 1, # parameter is optional
+            either_or       => [ qw/foo bar baz/ ], # param or foo or bar or baz must be set
             must_match      => qr/foo/, # value must match given regex
             must_not_match  => qr/bar/, # value must NOT match the given regex
             max             => 20, # value must not exceed 20 characters in length
@@ -2907,6 +3674,7 @@ Here is the list of all valid ruleset keys:
             max_error            => '', # same for max rule
             min_error            => '', # same for min rule
             code_error           => '', # same for code rule
+            either_or_error      => '', # same for either_or rule
             valid_values_error   => '', # same for valid_values rule
             param_error          => '', # same fore param rule
         },
@@ -2919,7 +3687,8 @@ C<name>
     name => 'Decent name',
 
 This is not actually a rule but the text to use for the name of the parameter in error
-messages. If not specified the actual parameter name will be used.
+messages. If not specified the actual parameter name - on which C<ucfirst()> will be run -
+will be used.
 
 C<num>
 
@@ -2938,6 +3707,21 @@ other rules along with this one, e.g.:
     num      => 1,
 
 Means, query parameter is optional, B<but if it is given> it must contain only digits.
+
+C<either_or>
+
+    optional    => 1, # must use this
+    either_or   => 'foo',
+
+    optional    => 1, # must use this
+    either_or   => [ qw/foo bar baz/ ],
+
+The C<optional> rul B<must be set to a true value> in order for C<either_or> rule to work.
+The rule takes either a string or an arrayref as a value. Specifying a string as a value is
+the same as specifying a hashref with just that string in it. Each string in an arrayref
+represents the name of a query parameter. In order for the rule to succeed B<either> one
+of the parameters must be set. It's a bit messy, but you must use the C<optional> rule
+as well as list the C<either_or> rule for every parameter that is tested for "either or" rule.
 
 C<must_match>
 
@@ -3055,6 +3839,13 @@ C<code_error>
 This is the error for C<code> rule. B<Defaults to:>
 C<Parameter $name contains incorrect data>
 
+C<either_or_error>
+
+    either_or_error => "You must specify either Foo or Bar",
+
+This is the error for C<either_or> rule.
+B<Defaults to:> C<Parameter $name must contain data if other parameters are not set>
+
 C<valid_values_error>
 
     valid_values_error => 'Pick the correct one!!!',
@@ -3078,8 +3869,18 @@ HTML::Template VARIABLES
         <p class="error"><tmpl_var name="plug_form_checker_error"></p>
     </tmpl_if>
 
+    # or, if 'all_errors' is turned on:
+    <tmpl_if name="plug_form_checker_error">
+        <tmpl_loop name="plug_form_checker_error">
+            <p class="error"><tmpl_var name="error"></p>
+        </tmpl_loop>
+    </tmpl_if>
+
 If the form values failed any of your checks, the plugin will set C<plug_form_checker_error>
-key in C<{t}> special key explaining the error. The sample usage of this is presented above.
+key in C<{t}> special key explaining the error. If C<all_errors> option is turned on, then
+the plugin will set C<plug_form_checker_error> to a data structure that you can feed
+into C<< <tmpl_loop name=""> >> where the C<< <tmpl_var name="error"> >> will be replaced
+with the error message. The sample usage of this is presented above.
 
 
 =head1 App::ZofCMS::Plugin::FormFiller (version 0.0101)
@@ -3168,7 +3969,7 @@ if the user edits some fields you have have the preset values along with those c
 by the user.
 
 
-=head1 App::ZofCMS::Plugin::FormMailer (version 0.0101)
+=head1 App::ZofCMS::Plugin::FormMailer (version 0.0201)
 
 NAME
 
@@ -3230,11 +4031,12 @@ doing then make sure to set the correct priority:
 C<plug_form_mailer>
 
         plug_form_mailer => {
-            trigger => [ qw/ d   plug_form_checker_ok / ],
-            subject => 'Zen of Design Account Request',
-            to      => 'foo@bar.com',
-            mailer  => 'testfile',
-            format  => <<'END',
+            trigger     => [ qw/ d   plug_form_checker_ok / ],
+            subject     => 'Zen of Design Account Request',
+            to          => 'foo@bar.com',
+            ok_redirect => 'http://google.com/',
+            mailer      => 'testfile',
+            format      => <<'END',
     The following account request has been submitted:
     First name: {:{first_name}:}
     Time:       {:[time]:}
@@ -3249,6 +4051,10 @@ their values from ZofCMS Template. Possible keys/values are as follows:
 
 C<format>
 
+        format  => \'file_name_relative_to_templates',
+
+        # or
+
         format  => <<'END',
     The following account request has been submitted:
     First name: {:{first_name}:}
@@ -3257,7 +4063,14 @@ C<format>
     END
         },
 
-B<Mandatory>. The C<format> key takes a scalar as a value. This scalar represents the body
+B<Mandatory>. The C<format> key takes a scalar or a scalarref as a value.
+When the value is a B<scalarref> then it is interpreted as a file name relative to the
+"templates" dir; this file will be read and its contents will serve as a value for C<format>
+argument (i.e. same as specifying contents of the file to C<format> as scalar value).
+If an error occured when opening the file, the plugin will set the C<plug_form_mailer_error>
+in the C<{t}> special key to the error message and will set the C<format> to an empty string.
+
+When value is a B<scalar>, it represents the body
 of the e-mail that plugin will send. In this scalar you can use special "tags" that will
 be replaced with data. The tag format is C<{:{TAG_NAME}:}>. Tag name cannot contain a closing
 curly bracket (C<}>) in it. Two special tags are C<{:[time]:}> and C<{:[host]:}> (note
@@ -3313,6 +4126,14 @@ keys of ZofCMS Template hashref. The C<ok_key> specifies the name of that first-
 Note that that key's must value must be a hashref. B<Defaults to:> C<t> (thus you can
 readily use the C<< <tmpl_if name="plug_form_mailer_ok"> >> to check for success (or rather
 display some messages).
+
+C<ok_redirect>
+
+    ok_redirect => 'http://google.com/',
+
+B<Optional>. Takes a string with a URL in it. When specified the plugin will redirect the
+user to the page specified in C<ok_redirect> after sending the mail. B<By default> is not
+specified.
 
 
 =head1 App::ZofCMS::Plugin::FormToDatabase (version 0.0101)
@@ -3451,6 +4272,506 @@ SEE ALSO
 L<DBI>, L<App::ZofCMS::Plugin::DBI>
 
 
+=head1 App::ZofCMS::Plugin::HTMLFactory (version 0.0101)
+
+NAME
+
+
+Link: L<App::ZofCMS::Plugin::HTMLFactory>
+
+
+
+App::ZofCMS::Plugin::HTMLFactory - notes for modules in App::ZofCMS::Plugin::HTMLFactory:: namespace
+
+DESCRIPTION
+
+This is not a module but explanation and suggestions for modules in
+C<App::ZofCMS::Plugin::HTMLFactory::> namespace.
+
+This documentation assumes you've read L<App::ZofCMS>, L<App::ZofCMS::Config> and L<App::ZofCMS::Template>
+
+WTF IS THIS ABOUT?
+
+The C<App::ZofCMS::Plugin::HTMLFactory::> namespace is for L<App::ZofCMS> plugins that do
+nothing special but provide some canned HTML codes that are used a lot and are a PITA to type
+out over and over again.
+
+NOTE FOR DEVS
+
+The plugins in C<App::ZofCMS::Plugin::HTMLFactory::> typically would be run when they are
+included in the list of plugins to run. No special keys in ZofCMS Template are expected.
+
+The plugins would usually set keys in C<{t}> ZofCMS Template special key that would be replaced
+with canned HTML codes.
+
+These are not laws, however, feel free to experiment.
+
+
+=head1 App::ZofCMS::Plugin::HTMLFactory::Entry (version 0.0101)
+
+NAME
+
+
+Link: L<App::ZofCMS::Plugin::HTMLFactory::Entry>
+
+
+
+App::ZofCMS::Plugin::HTMLFactory::Entry - plugin to wrap content in three divs used for styling boxes
+
+SYNOPSIS
+
+In your Main Config File or ZofCMS Template file:
+
+    plugins => [ qw/HTMLFactory::Entry/ ],
+
+In your L<HTML::Template> template:
+
+    <tmpl_var name='entry_start'>
+        <p>Some content</p>
+    <tmpl_var name='entry_end'>
+
+DESCRIPTION
+
+The module is a plugin for L<App::ZofCMS>. The module resides in
+C<App::ZofCMS::Plugin::HTMLFactory::> namespace thus only provides some packed HTML code.
+
+I use the HTML code provided by the plugin virtually on every site, and am sick and tired of
+writing it! Hence the plugin.
+
+This documentation assumes you've read L<App::ZofCMS>, L<App::ZofCMS::Config> and L<App::ZofCMS::Template>
+
+MAIN CONFIG FILE AND ZofCMS TEMPLATE FIRST-LEVEL KEYS
+
+C<plugins>
+
+    plugins => [ qw/HTMLFactory::Entry/ ],
+
+To run the plugin all you have to do is include it in the list of plugins to execute.
+
+HTML::Template VARIABLES
+
+    <tmpl_var name='entry_start'>
+    <tmpl_var name='entry_end'>
+
+The plugins creates two keys in C<{t}> ZofCMS Template special keys.
+
+C<entry_start>
+
+    <tmpl_var name='entry_start'>
+
+The C<entry_start> will be replaced with the following HTML code:
+
+    <div class="entry">
+        <div class="entry_top">
+            <div class="entry_bottom">
+
+C<entry_end>
+
+    <tmpl_var name='entry_end'>
+
+The C<entry_end> will be replaced with the following HTML code:
+
+            </div>
+        </div>
+    </div>
+
+
+=head1 App::ZofCMS::Plugin::ImageGallery (version 0.0201)
+
+NAME
+
+
+Link: L<App::ZofCMS::Plugin::ImageGallery>
+
+
+
+App::ZofCMS::Plugin::ImageGallery - CRUD-like plugin for managing images.
+
+SYNOPSIS
+
+In your Main Config File or ZofCMS Template file:
+
+    plugins => [ qw/ImageGallery/ ],
+
+    plug_image_gallery => {
+        dsn        => "DBI:mysql:database=test;host=localhost",
+        user       => 'test',
+        pass       => 'test',
+        no_form    => 0,
+        allow_edit => 1,
+    },
+
+In your L<HTML::Template> template:
+
+    <tmpl_var name='plug_image_gallery_form'>
+    <tmpl_var name='plug_image_gallery_list'>
+
+Viola, now you can upload photos with descriptions, delete them and edit descriptions. \o/
+
+DESCRIPTION
+
+The module is a plugin for L<App::ZofCMS> that allows one to add a CRUD-like functionality
+for managing photos. The plugin automatically makes thumbnails and can also resize the
+actual photos if you tell it to. So far, only
+C<.jpg>, C<.png> and C<.gif> images are supported; however, plugin does not check
+C<Content-Type> of the uploaded image.
+
+The image file name and description are stored in a SQL database.
+
+This documentation assumes you've read L<App::ZofCMS>, L<App::ZofCMS::Config> and L<App::ZofCMS::Template>
+
+USED SQL TABLE FORMAT
+
+When C<create_table> option is turned on (see below) the plugin will create the following
+table where C<table_name> is derived from C<table> argument in C<plug_image_gallery>
+(see below).
+
+    CREATE TABLE table_name (
+        photo        TEXT,
+        width        SMALLINT,
+        height       SMALLINT,
+        thumb_width  SMALLINT,
+        thumb_height SMALLINT,
+        description  TEXT,
+        time         VARCHAR(10),
+        id           TEXT
+    );
+
+MAIN CONFIG FILE AND ZofCMS TEMPLATE FIRST-LEVEL KEYS
+
+C<plugins>
+
+    plugins => [ qw/ImageGallery/, ],
+
+You obviously need to include the plugin in the list of plugins to execute.
+
+C<plug_image_gallery>
+
+    plug_image_gallery => {
+        dsn             => "DBI:mysql:database=test;host=localhost",
+        # everything below is optional
+        user            => '',
+        pass            => '',
+        opt             => { RaiseError => 1, AutoCommit => 1 },
+        table           => 'photos',
+        photo_dir       => 'photos/',
+        filename        => '[:rand:]',
+        thumb_dir       => 'photos/thumbs/',
+        create_table    => 0,
+        t_name          => 'plug_image_gallery',
+        no_form         => 1,
+        no_list         => 0,
+        no_thumb_desc   => 0,
+        allow_edit      => 0,
+        thumb_size      => { 200, 200 },
+        # photo_size      => [ 600, 600 ],
+        has_view        => 1,
+        want_lightbox   => 0,
+        lightbox_rel    => 'lightbox',
+        lightbox_desc   => 1,
+    }
+
+The plugin takes its configuration from C<plug_image_gallery> first-level key that takes
+a hashref as a value and can be specified in either (or both) Main Config File and
+ZofCMS Template file. If the same key in that hashref is specified in both, Main Config File
+and ZofCMS Tempate file, then the value given to it in ZofCMS Template will take precedence.
+
+The plugin will B<NOT> run if C<plug_image_gallery> is not set or if B<both> C<no_form>
+B<and> C<no_list> arguments (see below) are set to true values.
+
+The possible C<plug_image_gallery> hashref's keys/values are as follows:
+
+C<dsn>
+
+    dsn => "DBI:mysql:database=test;host=localhost",
+
+B<Mandatory>. Takes a scalar as a value which must contain a valid
+"$data_source" as explained in L<DBI>'s C<connect_cached()> method (which
+plugin currently uses).
+
+C<user>
+
+    user => '',
+
+B<Optional>. Takes a string as a value that specifies the user name to use when authorizing
+with the database. B<Defaults to:> empty string
+
+C<pass>
+
+    pass => '',
+
+B<Optional>. Takes a string as a value that specifies the password to use when authorizing
+with the database. B<Defaults to:> empty string
+
+C<opt>
+
+    opt => { RaiseError => 1, AutoCommit => 1 },
+
+B<Optional>. Takes a hashref as a value, this hashref contains additional L<DBI>
+parameters to pass to C<connect_cached()> L<DBI>'s method. B<Defaults to:>
+C<< { RaiseError => 1, AutoCommit => 1 } >>
+
+C<table>
+
+    table => 'photos',
+
+B<Optional>. Takes a string as a value, specifies the name of the SQL table in which to
+store information about photos. B<Defaults to:> C<photos>
+
+C<create_table>
+
+    create_table => 0,
+
+B<Optional>. When set to a true value, the plugin will automatically create needed SQL table,
+you can create it manually if you wish, see its format in C<USED SQL TABLE FORMAT> section
+above. Generally you'd set this to a true value only once, at the start, and then you'd remove
+it because there is no "IF EXISTS" checks. B<Defaults to:> C<0>
+
+C<t_name>
+
+    t_name => 'plug_image_gallery',
+
+B<Optional>. Takes a string as a value. This string will be
+used as a "base name" for two keys that plugin generates in C<{t}> special key.
+The keys are C<plug_image_gallery_list> and C<plug_image_gallery_form>
+(providing C<t_name> is set to
+default) and are explained below in C<HTML::Template VARIABLES> section below. B<Defaults to:>
+C<plug_image_gallery>
+
+C<photo_dir>
+
+    photo_dir => 'photos/',
+
+B<Optional>. Takes a string that specifies the directory (relative to C<index.pl>) where
+the plugin will store photos. B<Note:> plugin does B<not> automatically create this directory.
+B<Defaults to:> C<photos/>
+
+C<thumb_dir>
+
+    thumb_dir => 'photos/thumbs/',
+
+B<Optional>. Takes a string that specifies the directory (relative to C<index.pl>) where
+the plugin will store thumbnails.
+B<Note:> plugin does B<not> automatically create this directory. B<Note 2:> this directory
+B<must NOT> be the same as C<photo_dir>.
+B<Defaults to:> C<photos/thumbs/>
+
+C<filename>
+
+    filename => '[:rand:]',
+
+B<Optional>. Specifies the name for the image file (and its thumbnail) without the extension
+for when new image is uploaded. You'd obviously want to manipulate this value with some
+other plugin (e.g. L<App::ZofCMS::Plugin::Sub>) to make sure it's not the same
+as existing images. B<Special value> of C<[:rand:]> (value includes the brackets) will make
+the plugin generate random filenames (along with check of whether the generated name
+already exists). B<Defaults to:> C<[:rand:]>
+
+C<thumb_size>
+
+    thumb_size => { 200, 200 }, # resize only if larger
+    thumb_size => [ 200, 200 ], # always resize
+
+B<Optional>. Takes either an arrayref with two elements or a hashref with one key/value pair.
+The plugin will generate thumbnails automatically. The C<thumb_size> specifies the dimensions
+of the thumbnails. The proportions are always kept when resizing. When C<thumb_size> is set
+to an I<arrayref>, the plugin will resize the image even if its smaller than the specified
+size (i.e. a 50x50 image's thumb will be scaled to 200x200 when C<thumb_size> is set to
+C<[200, 200]> ). The first element of the arrayref denotes the x (width) dimension and the
+second element denotes the y (height) dimension. When the value for C<thumb_size> is a
+I<hashref> then the key denotes the width and the value denotes the height; the image will
+be resized only if one of its dimensions (width or height) is larger than the specified
+values. In other words, when C<thumb_size> is set to C<{ 200, 200 }>, a 50x50 image's thumbnail
+will be left at 50x50 while a 500x500 image's thumbnail will be scaled to 200x200.
+B<Defaults to:> C<{ 200, 200 }>
+
+C<photo_size>
+
+    photo_size => { 600, 600 },
+    photo_size => [ 600, 600 ],
+
+B<Optional>. When specified takes either an arrayref or a hashref as a value. Everything is
+the same (regarding values) as the values for C<thumb_size> argument described above except
+that resizing is done on the original image. If C<photo_size> is not specified, no resizing
+will be performed. B<Note:> the thumbnail will be generated first, thus it's possible to
+have thumbnails that are larger than the original image even when hashrefs are used for
+both C<photo_size> and C<thumb_size>. B<By default is not specified>
+
+C<no_form>
+
+    no_form => 1,
+
+B<Optional>. Takes either true or false values. When
+set to a B<false> value, the plugin will generate as well as process an HTML form that
+is to be used for uploading new images or editing descriptions on existing ones.
+B<Note:> even if you are making your own HTML form, the plugin will B<not> process
+editing or deleting of items when C<no_form> is set to a true value. B<Defaults to:> C<1>
+
+C<no_list>
+
+    no_list => 0,
+
+B<Optional>. Takes either true or false values. When set to a B<false> value, the plugin
+will pull the data from the database and generate an HTML list with image thumbnails and their
+descriptions (unless C<no_thumb_desc> argument described below is set to a true value).
+B<Defaults to:> C<0>
+
+C<no_thumb_desc>
+
+    no_thumb_desc => 0,
+
+B<Optional>. Takes either true or false values. Makes sense only when C<no_list> is set to
+a false value. When C<no_thumb_desc> is set to a B<true> value, the plugin will not put
+descriptions in the generated list of thumbnails. The description will be visible only when
+the user clicks on the image to view it in large size (providing C<has_view> option that
+is described below is set to a true value). B<Defaults to:> C<0>
+
+C<has_view>
+
+    has_view => 1,
+
+B<Optional>. Takes either true or false values. Makes sense only when C<no_list> is set
+to a false value. When set to a true value, plugin will generate links for each thumbnail
+in the list; when user will click that link, he or she will be presented with an original
+image and a link to go back to the list of thumbs. When set to a false value no link
+will be generated. B<Defaults to:> C<1>
+
+C<allow_edit>
+
+    allow_edit => 0,
+
+B<Optional>. Takes either true or false values. When set to a true value, B<both> C<no_list>
+and B<no_form> must be set to false values.  When set to a true value, the plugin will
+generate C<Edit> and C<Delete> buttons under each thumbnail in the list. Clicking "Delete" will
+delete the image, thumbnail and entry in the database. Clicking "Edit" will fetch the
+description into the "description" field in the form, allowing the user to edit it.
+B<Defaults to:> C<0>
+
+C<want_lightbox>
+
+    want_lightbox => 0,
+
+B<Optional>. The list of thumbs generated by the plugin can be generated for use with
+"Lightbox" JavaScript crapolio. Takes true or false values. When set to a true value, the
+thumb list will be formatted for use with "Lightbox". B<Note:> C<has_view> B<must> be set
+to a true value as well. B<Defaults to:> C<0>
+
+C<lightbox_rel>
+
+    lightbox_rel => 'lightbox',
+
+B<Optional>. Used only when C<want_lightbox> is set to a true value. Takes a string as a value,
+this string will be used for C<rel=""> attribute on links. B<Defaults to:> C<lightbox>
+
+C<lightbox_desc>
+
+    lightbox_desc => 1,
+
+B<Optional>. Takes either true or false values. When set to a true value, the plugin will
+stick image descriptions into C<title=""> attribute that makes them visible in the Lightbox.
+B<Defaults to:> C<1>
+
+HTML::Template VARIABLES
+
+The plugin generates two keys in C<{t}> ZofCMS Template special key, thus making them
+available for use in your L<HTML::Template> templates. Assuming C<t_name> is left at its
+default value the following are the names of those two keys:
+
+C<plug_image_gallery_form>
+
+    <tmpl_var name='plug_image_gallery_form'>
+
+This variable will contain HTML form generated by the plugin, the form also includes display
+of errors.
+
+C<plug_image_gallery_list>
+
+    <tmpl_var name='plug_image_gallery_list'>
+
+This variable will contain the list of photos generated by the plugin.
+
+GENERATED HTML CODE
+
+form
+
+    <form action="" method="POST" id="plug_image_gallery_form" enctype="multipart/form-data">
+    <div>
+        <input type="hidden" name="page" value="photos">
+        <input type="hidden" name="dir" value="/admin/">
+        <ul>
+            <li>
+                <label for="plug_image_gallery_file">Image: </label
+                ><input type="file" name="plug_image_gallery_file" id="plug_image_gallery_file">
+            </li>
+            <li>
+                <label for="plug_image_gallery_description">Description: </label
+                ><textarea name="plug_image_gallery_description" id="plug_image_gallery_description" cols="60" rows="5"></textarea>
+            </li>
+        </ul>
+        <input type="submit" name="plug_image_gallery_submit" value="Upload">
+    </div>
+    </form>
+
+form when "Edit" was clicked
+
+    <form action="" method="POST" id="plug_image_gallery_form" enctype="multipart/form-data">
+    <div>
+        <input type="hidden" name="page" value="photos">
+        <input type="hidden" name="dir" value="/admin/">
+        <input type="hidden" name="plug_image_gallery_id" value="07537915760568812292592510718228816144752">
+        <ul>
+            <li>
+                <label for="plug_image_gallery_description">Description: </label
+                ><textarea name="plug_image_gallery_description" id="plug_image_gallery_description" cols="60" rows="5">Teh Descripshun!</textarea>
+            </li>
+        </ul>
+        <input type="submit" name="plug_image_gallery_submit" value="Update">
+    </div>
+    </form>
+
+form when upload or update was successful
+
+    <p>Your image has been successfully uploaded.</p>
+    <p><a href="/index.pl?page=photos&amp;amp;dir=/admin/">Upload another image</a></p>
+
+list (when both C<allow_edit> and C<has_view> is set to true values)
+
+    <ul class="plug_image_gallery_list">
+        <li>
+            <a href="/index.pl?page=photos&amp;dir=/admin/&amp;plug_image_gallery_photo_id=037142535745273312292651650508033404216754"><img src="/photos/thumbs/0029243203419358812292651650444418525180907.jpg" width="191" height="200" alt=""></a>
+                <form action="" method="POST">
+                <div>
+                    <input type="hidden" name="plug_image_gallery_id" value="037142535745273312292651650508033404216754">
+                    <input type="hidden" name="page" value="photos">
+                    <input type="hidden" name="dir" value="/admin/">
+                    <input type="submit" name="plug_image_gallery_action" value="Edit">
+                    <input type="submit" name="plug_image_gallery_action" value="Delete">
+                </div>
+                </form>
+        </li>
+        <li class="alt">
+            <a href="/index.pl?page=photos&amp;dir=/admin/&amp;plug_image_gallery_photo_id=07537915760568812292592510718228816144752"><img src="/photos/thumbs/058156553244134912292592510947564500241668.png" width="200" height="125" alt=""></a>
+            <p>Teh Descripshun!</p>
+                <form action="" method="POST">
+                <div>
+                    <input type="hidden" name="plug_image_gallery_id" value="07537915760568812292592510718228816144752">
+                    <input type="hidden" name="page" value="photos">
+                    <input type="hidden" name="dir" value="/admin/">
+                    <input type="submit" name="plug_image_gallery_action" value="Edit">
+                    <input type="submit" name="plug_image_gallery_action" value="Delete">
+                </div>
+                </form>
+        </li>
+    </ul>
+
+original image view
+
+    <a class="plug_image_gallery_return_to_image_list" href="/index.pl?page=photos&amp;dir=/admin/">Return to image list.</a>
+    <div id="plug_image_gallery_photo"><img src="/photos/0029243203419358812292651650444418525180907.jpg" width="575" height="600" alt="">
+        <p class="plug_image_gallery_description">Uber hawt chick</p>
+    </div>
+
+
 =head1 App::ZofCMS::Plugin::LinksToSpecs::CSS (version 0.0101)
 
 NAME
@@ -3583,7 +4904,7 @@ SEE ALSO
 L<http://www.w3.org/TR/html4/>
 
 
-=head1 App::ZofCMS::Plugin::NavMaker (version 0.0102)
+=head1 App::ZofCMS::Plugin::NavMaker (version 0.0103)
 
 NAME
 
@@ -3596,7 +4917,7 @@ App::ZofCMS::Plugin::NavMaker - ZofCMS plugin for making navigation bars
 
 SYNOPSIS
 
-In your ZofCMS Template:
+In your Main Config File or ZofCMS Template:
 
     nav_maker => [
         qw/Foo Bar Baz/,
@@ -3629,7 +4950,7 @@ navigation bars I was fed up... and released this tiny plugin.
 This documentation assumes you've read L<App::ZofCMS>,
 L<App::ZofCMS::Config> and L<App::ZofCMS::Template>
 
-FIRST LEVEL ZofCMS TEMPLATE KEYS
+MAIN CONFIG FILE AND ZofCMS TEMPLATE FIRST LEVEL KEYS
 
 C<plugins>
 
@@ -3647,7 +4968,29 @@ C<nav_maker>
         [ qw(foo /foo-bar-baz), 'This is the title=""', 'this_is_id' ],
     ],
 
-Takes an arrayref as a value elements of which can either be strings
+    nav_maker => sub {
+        my ( $template, $query, $config ) = @_;
+
+        return [
+            qw/Foo Bar Baz/,
+            [ qw(Home /home) ],
+            [ qw(Music /music) ],
+            [ qw(foo /foo-bar-baz), 'This is the title=""', 'this_is_id' ],
+        ];
+    }
+
+Can be specified in either Main Config File first-level key or ZofCMS template first-level
+key. If specified in both, the one in ZofCMS Template will take precedence.
+Takes an arrayref or a subref as a value. If the value is a B<subref>, it must return
+an arrayref, which will be processed the same way as if the returned arrayref would be
+assigned to C<nav_maker> key instead of the subref (see description further). The C<@_> of
+the sub will contain the following: C<$template>, C<$query> and C<$config> (in that
+order), where C<$template> is the ZofCMS Template hashref, C<$query> is the query parameters
+(param names are keys and values are their values) and C<$config> is the
+L<App::ZofCMS::Config> object.
+
+The elements of the arrayref (whether directly assigned or returned from the subref)
+can either be strings
 or arrayrefs, element which is a string is the same as an arrayref with just
 that string as an element. Each of those arrayrefs can contain from one
 to four elements. They are interpreted as follows:
@@ -3755,7 +5098,7 @@ and parameter C<baz> would be accessible via C<query_baz>
     Baz is: <tmpl_var name="query_baz">
 
 
-=head1 App::ZofCMS::Plugin::QuickNote (version 0.0105)
+=head1 App::ZofCMS::Plugin::QuickNote (version 0.0106)
 
 NAME
 
@@ -3929,6 +5272,25 @@ B<Optional>. Specifies the text to display to your visitor when the
 quicknote is successfuly sent. B<Defaults to:>
 C<'Your message has been successfuly sent'>.
 
+C<on_success>
+
+    on_success => 'quicknote_success'
+
+B<Optional>. Takes a string as a value that representes a key in C<{t}> special key. When
+specified, the plugin will set the C<on_success> key in C<{t}> special key to a true value
+when the quicknote has been sent; this can be used to display some special messages
+when quick note succeeds. B<By default> is not specified.
+
+C<on_error>
+
+    on_error => 'quicknote_error'
+
+B<Optional>. Takes a string as a value that representes a key in C<{t}> special key. When
+specified, the plugin will set the C<on_error> key in C<{t}> special key to a true value
+when the quicknote has not been sent due to some error, e.g. user did not specify mandatory
+parameters; this can be used to display some special messages
+when quick note fails. B<By default> is not specified.
+
 C<format>
 
         format      => <<'END_FORMAT',
@@ -3984,9 +5346,149 @@ Below is the HTML code generated by the plugin. Use CSS to style it.
                 cols="40" rows="10"></textarea>
             </li>
         </ul>
-        <input type="submit" value="Send">
+        <input type="submit" id="quicknote_submit" value="Send">
     </div>
     </form>
+
+
+=head1 App::ZofCMS::Plugin::SplitPriceSelect (version 0.0102)
+
+NAME
+
+
+Link: L<App::ZofCMS::Plugin::SplitPriceSelect>
+
+
+
+App::ZofCMS::Plugin::SplitPriceSelect - plugin for generating a <select> for "price range" out of arbitrary range of prices.
+
+SYNOPSIS
+
+In your Main Config File or ZofCMS Template:
+
+    plugins => [ qw/SplitPriceSelect/ ],
+
+    plug_split_price_select => {
+        prices => [ 200, 300, 1000, 4000, 5000 ],
+    },
+
+In your L<HTML::Template> file:
+
+    <form...
+        <label for="plug_split_price_select">Price range: </label>
+        <tmpl_var name='plug_split_price_select'>
+    .../form>
+
+DESCRIPTION
+
+The module is a plugin for L<App::ZofCMS> that allows you to give several prices and plugin
+will create a C<< <select> >> HTML element with its C<< <option> >>s containing I<ranges> of
+prices. The idea is that you'd specify how many options you would want to have and plugin will
+figure out how to split the prices to generate that many ranges.
+
+This documentation assumes you've read L<App::ZofCMS>, L<App::ZofCMS::Config> and
+L<App::ZofCMS::Template>
+
+MAIN CONFIG FILE AND ZofCMS TEMPLATE FIRST-LEVEL KEYS
+
+C<plugins>
+
+    plugins => [ qw/SplitPriceSelect/ ],
+
+You need to add the plugin in the list of plugins to execute.
+
+C<plug_split_price_select>
+
+    plug_split_price_select => {
+        prices      => [ qw/foo bar baz/ ],
+        t_name      => 'plug_split_price_select',
+        options     => 3,
+        name        => 'plug_split_price_select',
+        id          => 'plug_split_price_select',
+        dollar_sign => 1,
+    }
+
+The C<plug_split_price_select> first-level key takes a hashref as a value. If a certain key
+in that hashref is specified in both, Main Config File and ZofCMS Template, then the
+value given in ZofCMS Template will take precedence. Plugin will not run if
+C<plug_split_price_select> is not specified (or if C<prices> key's arrayref is empty).
+Possible keys/value of C<plug_split_price_select> hashref are as follows:
+
+C<prices>
+
+    prices => [ qw/foo bar baz/ ],
+
+B<Mandatory>. Takes an arrayref as a value, plugin will not run if C<prices> arrayref is
+empty or C<prices> is set to C<undef>. The arrayref's elements represent the prices for
+which you wish to generate ranges. All elements must be numeric.
+
+C<options>
+
+    options => 3,
+
+B<Optional>. Takes a positive integer as a value. Specifies how many price ranges (i.e.
+C<< <option> >>s) you want to have. B<Note:> if there are not enough prices
+in the C<prices> argument, expect to have ranges with the same price on both sides; with
+evel smaller dataset, expect to have less than C<options> C<< <option> >>s generated.
+B<Defaults to:> C<3>
+
+C<t_name>
+
+    t_name => 'plug_split_price_select',
+
+B<Optional>. Plugin will put generated C<< <select> >> into C<{t}> ZofCMS Template special key,
+the C<t_name> parameter specifies the name of that key. B<Defaults to:>
+C<plug_split_price_select>
+
+C<name>
+
+    name => 'plug_split_price_select',
+
+B<Optional>. Specifies the value of the C<name=""> attribute on the generated C<< <select> >>
+element. B<Defaults to:> C<plug_split_price_select>
+
+C<id>
+
+    id => 'plug_split_price_select',
+
+B<Optional>. Specifies the value of the C<id=""> attribute on the generated C<< <select> >>
+element. B<Defaults to:> C<plug_split_price_select>
+
+C<dollar_sign>
+
+    dollar_sign => 1,
+
+B<Optional>. Takes either true or false values. When set to a true value, the C<< <option> >>s
+will contain a dollar sign in front of prices when displayed in the browser (the
+C<value="">s will still B<not> contain the dollar sign, see C<PARSING QUERY> section below).
+B<Defaults to:> C<1>
+
+PARSING QUERY
+
+    plug_split_price_select=500-14000
+
+Now, the price ranges are generated and you completed your gorgeous form... how to parse
+those ranges is the question. The C<value=""> attribute of each of generated C<< <option> >>
+element will contain the starting price in the range followed by a C<-> (dash, rather minus
+sign) followed by the ending price in the range. B<Note:> the price on each end of the
+range may be the same if there are not enough prices available.
+Thus you can do something along the lines of:
+
+    my ( $start_price, $end_price ) = split /-/, $query->{plug_split_price_select};
+    my @products_in_which_the_user_is_interested = grep {
+        $_->{price} >= $start_price and $_->{price} <= $end_price
+    } @all_of_the_products;
+
+GENERATED HTML CODE
+
+This is what the HTML code generated by the plugin looks like (providing all the optional
+arguments are left at their default values):
+
+    <select id="plug_split_price_select" name="plug_split_price_select">
+        <option value="200-1000">$200 - $1000</option>
+        <option value="4000-6000">$4000 - $6000</option>
+        <option value="7000-7000">$7000 - $7000</option>
+    </select>
 
 
 =head1 App::ZofCMS::Plugin::StyleSwitcher (version 0.0101)
@@ -5296,7 +6798,7 @@ The example above will generate the following code:
 Note: the class of the C<< <ul> >> element is always C<page_toc>
 
 
-=head1 App::ZofCMS::Plugin::UserLogin (version 0.0102)
+=head1 App::ZofCMS::Plugin::UserLogin (version 0.0103)
 
 NAME
 
@@ -5839,6 +7341,374 @@ NOTES ON TESTING
 The W3C validator cannot validate pages that are not publicly accessible, i.e. (possibly) your
 development server; thus clicking the links from your local version of site will make
 the validator error out.
+
+
+=head1 App::ZofCMS::Plugin::YouTube (version 0.0103)
+
+NAME
+
+
+Link: L<App::ZofCMS::Plugin::YouTube>
+
+
+
+App::ZofCMS::Plugin::YouTube - CRUD-type plugin to manage YouTube videos
+
+SYNOPSIS
+
+In your Main Config File or ZofCMS Template template:
+
+    plugins => [ qw/YouTube/, ],
+
+    plug_youtube => {
+        dsn            => "DBI:mysql:database=test;host=localhost", # everything below is pretty much optional
+        user            => '',
+        pass            => '',
+        opt             => { RaiseError => 1, AutoCommit => 1 },
+        t_name          => 'plug_youtube',
+        table           => 'videos',
+        create_table    => 0,
+        h_level         => 3,
+        size            => 1,
+        no_form         => 0,
+        no_list         => 0,
+        allow_edit      => 0,
+        ua_args => [
+            agent   => 'Opera 9.2',
+            timeout => 30,
+        ],
+        filter          => {
+            title       => qr/Foo/,
+            description => qr/Bar/,
+            link        => qr/234fd343/,
+        },
+    },
+
+In your L<HTML::Template> template:
+
+    <h2>Post new video</h2>
+    <tmpl_var name='plug_youtube_form'>
+
+    <h2>Existing Videos</h2>
+    <tmpl_var name='plug_youtube_list'>
+
+DESCRIPTION
+
+The module is a plugin for L<App::ZofCMS>. It provides means to have a CRUD-like (Create, Read,
+Update, Delete) interface for managing YouTube videos. The plugin provides a form where a
+user can enter the title of the video, its YouTube URI and a description. That form is stored
+in a SQL database by the plugin and can be displayed as a list.
+
+This documentation assumes you've read L<App::ZofCMS>, L<App::ZofCMS::Config> and
+L<App::ZofCMS::Template>
+
+When C<create_table> option is turned on (see below) the plugin will create the following
+table where C<table_name> is derived from C<table> argument in C<plug_youtube> (see below).
+
+    CREATE TABLE table_name (
+        title       TEXT,
+        link        TEXT,
+        description TEXT,
+        embed       TEXT,
+        time        VARCHAR(10),
+        id          TEXT
+    );
+
+MAIN CONFIG FILE AND ZofCMS TEMPLATE FIRST-LEVEL KEYS
+
+C<plugins>
+
+    plugins => [ qw/YouTube/ ],
+
+Without saying it, you need to add the plugin in the list of plugins to execute.
+
+C<plug_youtube>
+
+    plug_youtube => {
+        dsn            => "DBI:mysql:database=test;host=localhost", # everything below is pretty much optional
+        user            => '',
+        pass            => '',
+        opt             => { RaiseError => 1, AutoCommit => 1 },
+        t_name          => 'plug_youtube',
+        table           => 'videos',
+        create_table    => 0,
+        h_level         => 3,
+        size            => 1,
+        no_form         => 0,
+        no_list         => 0,
+        allow_edit      => 0,
+        ua_args => [
+            agent   => 'Opera 9.2',
+            timeout => 30,
+        ],
+        filter          => {
+            title       => qr/Foo/,
+            description => qr/Bar/,
+            link        => qr/234fd343/,
+        },
+    },
+
+The plugin takes its config via C<plug_youtube> first-level key that takes a hashref
+as a value and can be specified in
+either Main Config File or ZofCMS Template or both. If a certain key in that hashref is set
+in both, Main Config File and ZofCMS Template, the value for that key that is set in
+ZofCMS Template will take precendence. The possible keys/values are as follows (virtually
+all are optional and have default values):
+
+C<dsn>
+
+    dsn => "DBI:mysql:database=test;host=localhost",
+
+B<Mandatory>. Takes a scalar as a value which must contain a valid
+"$data_source" as explained in L<DBI>'s C<connect_cached()> method (which
+plugin currently uses).
+
+C<user>
+
+    user => '',
+
+B<Optional>. Takes a string as a value that specifies the user name to use when authorizing
+with the database. B<Defaults to:> empty string
+
+C<pass>
+
+    pass => '',
+
+B<Optional>. Takes a string as a value that specifies the password to use when authorizing
+with the database. B<Defaults to:> empty string
+
+C<opt>
+
+    opt => { RaiseError => 1, AutoCommit => 1 },
+
+B<Optional>. Takes a hashref as a value, this hashref contains additional L<DBI>
+parameters to pass to C<connect_cached()> L<DBI>'s method. B<Defaults to:>
+C<< { RaiseError => 1, AutoCommit => 1 } >>
+
+C<table>
+
+    table => 'videos',
+
+B<Optional>. Takes a string as a value, specifies the name of the SQL table in which to
+store information about videos. B<Defaults to:> C<videos>
+
+C<create_table>
+
+    create_table => 0,
+
+B<Optional>. When set to a true value, the plugin will automatically create needed SQL table,
+you can create it manually if you wish, see its format in C<USED SQL TABLE FORMAT> section
+above. Generally you'd set this to a true value only once, at the start, and then you'd remove
+it because there is no "IF EXISTS" checks. B<Defaults to:> C<0>
+
+C<t_name>
+
+    t_name => 'plug_youtube',
+
+B<Optional>. Takes a string as a value. This string will be
+used as a "base name" for two keys that plugin generates in C<{t}> special key.
+The keys are C<plug_youtube_list> and C<plug_youtube_form> (providing C<t_name> is set to
+default) and are explained below in C<HTML::Template VARIABLES> section below. B<Defaults to:>
+C<plug_youtube>
+
+C<h_level>
+
+    h_level => 3,
+
+B<Optional>. When generating a list of YouTube videos, plugin will use HTML C<< <h?> >>
+elements (see C<GENERATED HTML CODE> section below).
+The C<h_level> takes an integer between 1 and 6 and that value specifies what
+C<< <h?> >> level to generate. B<Defaults to:> C<3> (generate C<< <h3> >> elements)
+
+C<size>
+
+    size => 1,
+    # or
+    size => [ 300, 200 ],
+
+B<Optional>. Takes either an integer from 0 to 3 or an arrayref with two elements that are
+positive intergers as a value. When the value is an arrayref the first element is treated
+as the value of C<width=""> attribute and the second element is treated as the value for
+C<height=""> attribute. These two control the size of the video. You can also use
+integers from 0 to 3 to specify a "prefabricated" size (sort'f like a shortcut). The relation
+between the integers and the sizes they represent is shown below. B<Defaults to:> C<1> (
+size 425x344)
+
+    0 => [ 320, 265 ],
+    1 => [ 425, 344 ],
+    2 => [ 480, 385 ],
+    3 => [ 640, 505 ],
+
+C<no_form>
+
+    no_form => 0,
+
+B<Optional>. Plugin generates an HTML form to input videos into the database, besides that,
+it also B<processes> that form and makes sure everything is right. When C<no_form> is
+set to a true value, the plugin will B<NOT> generate the form and most importantly it will
+B<NOT> process anything; so if you are making your own form for input, make sure to leave
+C<no_form> as false. B<Defaults to:> C<0>s
+
+C<no_list>
+
+    no_list => 0,
+
+B<Optional>. Plugin automatically fetches all the available videos from the database and
+prepares an HTML list to present them. When C<no_list> is set to a true value, plugin
+will not generate any lists. B<Defaults to:> C<0>
+
+C<allow_edit>
+
+    allow_edit => 0,
+
+B<Optional>. Applies only when both C<no_form> and C<no_list> are set to false values.
+Takes either true or false values. When set to a true value, plugin will add C<Edit> and
+C<Delete> buttons under every video with which the user will be able to (duh!) edit and
+delete videos. B<Defaults to:> C<0>
+
+B<Note:> the "edit" is not that smart in this plugin, what actually
+happens is the video is deleted and its information is filled in the "entry" form. If the
+user never hits "Add" button on the form, the video will be lost; let me know if this
+creates a problem for you.
+
+C<filter>
+
+    filter => {
+        title       => qr/Foo/,
+        description => qr/Bar/,
+        link        => qr/234fd343/,
+    },
+
+B<Optional>. You can set a filter when displaying the list of videos. The C<filter>
+argument takes a hashref as a value. All keys take a regex (C<qr//>) as a value. The field
+referenced by the key B<must match> the regex in order for the video to be put in the list
+of videos. B<By default> is not specified. You can specify either 1 or all 3 keys. Possible
+keys and what they reference are as follows:
+
+C<title>
+
+    filter => {
+        title => qr/Foo/,
+    },
+
+B<Optional>. The C<title> key's regex matches the titles of the videos.
+
+C<description>
+
+    filter => {
+        description => qr/Bar/,
+    },
+
+B<Optional>. The C<description> key's regex matches the descriptions of the videos.
+
+C<link>
+
+    filter => {
+        link => qr/234fd343/,
+    },
+
+B<Optional>. The C<link> key's regex matches the links of the videos.
+
+C<ua_args>
+
+    ua_args => [
+        agent   => 'Opera 9.2',
+        timeout => 30,
+    ],
+
+B<Optional>. Under the hood plugin uses L<LWP::UserAgent> to access YouTube for fetching
+the "embed" code for the videos. The C<ua_args> takes an arrayref as a value. This
+arrayref will be directly derefrenced into L<LWP::UserAgent>'s constructor (C<new()> method).
+See L<LWP::UserAgent> for possible options. B<Defaults to:>
+C<< [ agent => 'Opera 9.2', timeout => 30, ] >>
+
+HTML::Template VARIABLES
+
+The plugin generates two keys in C<{t}> ZofCMS Template special key, thus making them
+available for use in your L<HTML::Template> templates. Assuming C<t_name> is left at its
+default value the following are the names of those two keys:
+
+C<plug_youtube_form>
+
+    <tmpl_var name='plug_youtube_form'>
+
+This variable will contain HTML form generated by the plugin, the form also includes display
+of errors.
+
+C<plug_youtube_list>
+
+    <tmpl_var name='plug_youtube_list'>
+
+This variable will contain the list of videos generated by the plugin.
+
+GENERATED HTML CODE
+
+form
+
+    <form action="" method="POST" id="plug_youtube_form">
+
+    <div>
+        <p class="error">Incorrect YouTube link
+        <input type="hidden" name="page" value="videos">
+        <input type="hidden" name="dir" value="/admin/">
+        <ul>
+            <li>
+                <label for="plug_youtube_title">Title: </label
+                ><input type="text" id="plug_youtube_title" name="plug_youtube_title" value="xxx">
+            </li>
+            <li>
+
+                <label for="plug_youtube_link">Link: </label
+                ><input type="text" id="plug_youtube_link" name="plug_youtube_link" value="">
+            </li>
+            <li>
+                <label for="plug_youtube_description">Description: </label
+                ><textarea id="plug_youtube_description" name="plug_youtube_description" cols="60" rows="10"></textarea>
+            </li>
+        </ul>
+        <input type="submit" name="plug_youtube_submit" value="Add">
+    </div>
+    </form>
+
+list
+
+B<Note:> the C<< <form> >> will not be there if C<allow_edit> option is set to a false
+value.
+
+    <ul id="plug_youtube_list">
+        <li>
+            <h3><a href="http://www.youtube.com/watch?v=RvcaNIwtkfI">Some club</a></h3>
+            <p class="plug_youtube_time">Posted on: Wed Dec 10 21:14:01 2008</p>
+            <div class="plug_youtube_video"><object width="200" height="165"><param name="movie" value="http://www.youtube.com/v/RvcaNIwtkfI&hl=en&fs=1"></param><param name="allowFullScreen" value="true"></param><param name="allowscriptaccess" value="always"></param><embed src="http://www.youtube.com/v/RvcaNIwtkfI&hl=en&fs=1" type="application/x-shockwave-flash" allowscriptaccess="always" allowfullscreen="true" width="200" height="165"></embed></object></div>
+            <p class="plug_youtube_description">Description</p>
+                <form action="" method="POST">
+                <div>
+                    <input type="hidden" name="plug_youtube_vid_edit_id" value="03716801501150291228961641000660045686842636">
+                    <input type="hidden" name="page" value="videos">
+                    <input type="hidden" name="dir" value="/admin/">
+                    <input type="submit" class="submit_button_edit" name="plug_youtube_vid_edit_action" value="Edit">
+                    <input type="submit" class="submit_button_delete" name="plug_youtube_vid_edit_action" value="Delete">
+                </div>
+                </form>
+        </li>
+        <li class="alt">
+            <h3><a href="http://www.youtube.com/watch?v=RvcaNIwtkfI">Some club</a></h3>
+            <p class="plug_youtube_time">Posted on: Wed Dec 10 21:13:30 2008</p>
+            <div class="plug_youtube_video"><object width="200" height="165"><param name="movie" value="http://www.youtube.com/v/RvcaNIwtkfI&hl=en&fs=1"></param><param name="allowFullScreen" value="true"></param><param name="allowscriptaccess" value="always"></param><embed src="http://www.youtube.com/v/RvcaNIwtkfI&hl=en&fs=1" type="application/x-shockwave-flash" allowscriptaccess="always" allowfullscreen="true" width="200" height="165"></embed></object></div>
+            <p class="plug_youtube_description">Description</p>
+                <form action="" method="POST">
+                <div>
+                    <input type="hidden" name="plug_youtube_vid_edit_id" value="051156628115950712289616100613964522347914">
+                    <input type="hidden" name="page" value="videos">
+                    <input type="hidden" name="dir" value="/admin/">
+                    <input type="submit" class="submit_button_edit" name="plug_youtube_vid_edit_action" value="Edit">
+                    <input type="submit" class="submit_button_delete" name="plug_youtube_vid_edit_action" value="Delete">
+                </div>
+                </form>
+        </li>
+    </ul>
+
+
 
 =head1 AUTHOR
 
