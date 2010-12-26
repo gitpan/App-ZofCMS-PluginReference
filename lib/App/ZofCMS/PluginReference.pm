@@ -3,7 +3,7 @@ package App::ZofCMS::PluginReference;
 use warnings;
 use strict;
 
-our $VERSION = '0.0106';
+our $VERSION = '0.0107';
 
 
 1;
@@ -16,6 +16,193 @@ App::ZofCMS::PluginReference - docs for all plugins in one document for easy ref
 =head1 DESCRIPTION
 
 I often found myself reaching out for docs for different plugins cluttering up my browser. The solution - stick all docs into one!.
+
+=head1 App::ZofCMS::Plugin::AccessDenied (version 0.0101)
+
+NAME
+
+
+Link: L<App::ZofCMS::Plugin::AccessDenied>
+
+
+
+App::ZofCMS::Plugin::AccessDenied - ZofCMS plugin to restrict pages based on user access roles
+
+SYNOPSIS
+
+    plugins => [
+        { AccessDenied => 2000 },
+    ],
+
+    # this key and all of its individual arguments are optional
+    # ... default values are shown here
+    plug_access_denied => {
+        role            => sub { $_[0]->{d}{user}{role} },
+        separator       => qr/\s*,\s*/,
+        key             => 'access_roles',
+        redirect_page   => '/access-denied',
+        master_roles    => 'admin',
+        no_exit         => 0,
+    },
+
+    # this user has three roles; but this page requires a different one
+    d => { user => { role => 'foo, bar,baz', }, },
+    access_roles => 'bez',
+
+DESCRIPTION
+
+The module is a plugin for L<App::ZofCMS> that provides means to
+restrict access to various pages. It's designed to work in conjunction
+with L<App::ZofCMS::Plugin::UserLogin> plugin; however, the use of that
+plugin is not required.
+
+This documentation assumes you've read L<App::ZofCMS>, 
+L<App::ZofCMS::Config> and L<App::ZofCMS::Template>
+
+FIRST-LEVEL ZofCMS TEMPLATE AND MAIN CONFIG FILE KEYS
+
+C<plugins>
+
+    plugins => [
+        { AccessDenied => 2000 },
+    ],
+
+B<Mandatory>. You need to include the plugin in the list of plugins to
+execute.
+
+C<plug_access_denied>
+
+    # default values shown
+    plug_access_denied => {
+        role            => sub { $_[0]->{d}{user}{role} },
+        separator       => qr/\s*,\s*/,
+        key             => 'access_roles',
+        redirect_page   => '/access-denied',
+        master_roles    => 'admin',
+        no_exit         => 0,
+    },
+
+    # or
+    plug_access_denied => sub {
+        my ( $t, $q, $config ) = @_;
+        return $hashref_to_assign_to_plug_access_denied_key;
+    },
+
+B<Optional>.
+Takes either a hashref or a subref as a value. If not specified, B<plugin
+will still run>, and all the defaults will be assumed. If subref is
+specified, its return value will be assigned to C<plug_access_denied> as if
+it was already there. The C<@_> of the subref will contain C<$t>, C<$q>,
+and C<$config> (in that order): where C<$t> is ZofCMS Tempalate hashref,
+C<$q> is query parameters hashref, and C<$config> is
+L<App::ZofCMS::Config> object. Possible keys/values for the hashref are as
+follows:
+
+C<role>
+
+    plug_access_denied => {
+        role => sub { $_[0]->{d}{user}{role} },
+    ...
+
+B<Optional>. Takes a subref as a value. This argument tells the plugin
+the access roles the current user (visitor) posseses and based on these, 
+the access to the page will be either granted or denied. The C<@_> will
+contain C<$t>, C<$q>, and C<$config> (in that order), where C<$t> is ZofCMS
+Template hashref, C<$q> is query parameter hashref, and C<$config> isf
+L<App::ZofCMS::Config> object. B<Defaults to:>
+C<< sub { $_[0]->{d}{user}{role} } >> (i.e. attain the value from the
+C<< $t->{d}{user}{role} >>). The subref must return one of the following:
+
+a string
+
+    plug_access_denied => {
+        role => sub { return 'foo, bar, baz' },
+    ...
+
+If the sub returns a string, the plugin will take it as containing
+one or more roles that the user (visitor of the page) has. Multiple roles
+must be separated using C<separator> (see below).
+
+an arrayref
+
+    plug_access_denied => {
+        role => sub { return [ qw/foo  bar  baz/ ] },
+    ...
+
+If sub returns an arrayref, each element of that arrayref will be assumed
+to be one role.
+
+a hashref
+
+    plug_access_denied => {
+        role => sub { return { foo => 1, bar => 1 } },
+    ...
+
+If hashref is returned, plugin will assume that the B<keys> of that hashref
+are the roles; plugin doesn't care about the values.
+
+C<separator>
+
+    plug_access_denied => {
+        separator => qr/\s*,\s*/,
+    ...
+
+B<Optional>. Takes a regex (C<qr//>) as a value. The value will be regarded
+as a separator for page's access roles (listed in C<key> key, see
+below), the value in C<role> (see above) if that argument is set to a
+string, as well as the value of C<master_roles> argument (see below). 
+B<Defaults to:> C<qr/\s*,\s*/>
+
+C<key>
+
+    plug_access_denied => {
+        key => 'access_roles',
+    ...
+
+B<Optional>. Takes a string as a value. Specifies the key, inside C<{t}>
+ZofCMS Template hashref's special key, under which a string with page's
+roles is located.
+Multiple roles must be separated with C<separator> (see above).
+User must possess at least one of these roles in order to be allowed to
+view the current page. B<Defaults to:> C<access_roles> (i.e.
+C<< $t->{t}{access_roles} >>)
+
+C<redirect_page>
+
+    plug_access_denied => {
+        redirect_page => '/access-denied',
+    ...
+
+B<Optional>. Takes a URI as a value. If access is denied to the visitor,
+they will be redirected to URI specified by C<redirect_page>. B<Defaults
+to:> C</access-denied>
+
+C<master_roles>
+
+    plug_access_denied => {
+        master_roles => 'admin',
+    ...
+
+B<Optional>. Takes the string a value that contains "master" roles. If the
+user has any of the roles specified in C<master_roles>, access to the page
+will be B<granted> regardless of what the page's required roles (specified 
+via C<key> argument) are. To disable C<master_roles>, use empty string. To 
+specify several roles, separate them with your C<separator> (see above).
+B<Defaults to:> C<admin>
+
+C<no_exit>
+
+    plug_access_denied => {
+        no_exit => 0,
+    ...
+
+B<Optional>. Takes either true or false values as a value. If set to
+a false value, the plugin will call C<exit()> after it tells the browser
+to redirect unauthorized user to C<redirect_page> (see above); otherwise,
+the script will continue to run, however, note that you B<will no longer
+be able to "interface" with the user> (i.e. if some later plugin dies, user
+will be already at the C<redirect_page>). B<Defaults to:> C<0> (false)
+
 
 =head1 App::ZofCMS::Plugin::AntiSpamMailTo (version 0.0101)
 
@@ -127,7 +314,111 @@ L<HTML::Template> template:
     <a href="<tmpl_var name="mailto">">email to John Foo</a>
 
 
-=head1 App::ZofCMS::Plugin::AutoIMGSize (version 0.0101)
+=head1 App::ZofCMS::Plugin::AutoDump (version 0.0101)
+
+NAME
+
+
+Link: L<App::ZofCMS::Plugin::AutoDump>
+
+
+
+App::ZofCMS::Plugin::AutoDump - debugging plugin to quickly dump out query parameters and ZofCMS Template hashref
+
+SYNOPSIS
+
+    plugins => [
+        { Sub => 200 },
+        { AutoDump => 300 },
+    ],
+
+    plug_sub => sub { ## this is optional, just for an example
+        my ( $t, $q ) = @_;
+        $t->{foo} = 'bar';
+        $q->{foo} = 'bar';
+    },
+
+DESCRIPTION
+
+The module is a plugin for L<App::ZofCMS> that provides means to quickly use L<Data::Dumper>
+to dump query parameters hashref as well as ZofCMS Template hashref.
+
+This documentation assumes you've read L<App::ZofCMS>, L<App::ZofCMS::Config> and L<App::ZofCMS::Template>
+
+HOW TO USE
+
+    plugins => [
+        { Sub => 200 },
+        { AutoDump => 300 },
+    ],
+
+This plugin requires no configuration. To run it simply include it in the list of plugins
+to execute with the priority set at the right point of execution line.
+
+HOW IT WORKS
+
+Plugin assumes that you're using L<CGI::Carp> (should be on by default if you've used
+C<zofcms_helper> script to generate site's skeleton). When plugin is run it calls
+C<die Dumper [ $q, $t ]> where C<$q> is query parameters hashref and C<$t> is
+ZofCMS Template hashef... therefore, in the browser's output the first hashef is the query.
+
+
+=head1 App::ZofCMS::Plugin::AutoEmptyQueryDelete (version 0.0101)
+
+NAME
+
+
+Link: L<App::ZofCMS::Plugin::AutoEmptyQueryDelete>
+
+
+
+App::ZofCMS::Plugin::AutoEmptyQueryDelete - automatically delete empty keys from query parameters
+
+SYNOPSIS
+
+    plugins => [
+        { AutoEmptyQueryDelete => 100 },
+        # plugins that work on query parameters with larger priority value
+    ],
+
+DESCRIPTION
+
+The module is a plugin for L<App::ZofCMS> that I made after I got sick and tired of
+constantly writing this (where C<$q> is query parameters hashref):
+
+    do_something
+        if defined $q->{foo}
+            and length $q->{foo};
+
+By simply including this module in the list of plugins to run, I can save a few keystrokes
+by writing:
+
+    do_something
+        if exists $q->{foo};
+
+This documentation assumes you've read L<App::ZofCMS>, L<App::ZofCMS::Config> and L<App::ZofCMS::Template>
+
+WHAT DOES THE PLUGIN DO
+
+The plugin doesn't do much, but simply C<delete()>s query parameters that are not defined
+or are of zero length if they are. With that being done, we can use a simple C<exists()>
+on a key.
+
+USING THE PLUGIN
+
+Plugin does not need any configuration. It will be run as long as it is included
+in the list of the plugins to run:
+
+    plugins => [
+        { AutoEmptyQueryDelete => 100 },
+        # plugins that work on query parameters with larger priority value
+    ],
+
+Make sure that the priority of the plugin is set to run B<before> your other code
+that would check on query with C<exists()>
+
+
+=head1 App::ZofCMS::Plugin::AutoIMGSize (version 0.0102)
 
 NAME
 
@@ -277,7 +568,230 @@ DEPENDENCIES
 The module relies on L<Image::Size> to get image sizes.
 
 
-=head1 App::ZofCMS::Plugin::Base (version 0.0102)
+=head1 App::ZofCMS::Plugin::Barcode (version 0.0103)
+
+NAME
+
+
+Link: L<App::ZofCMS::Plugin::Barcode>
+
+
+
+App::ZofCMS::Plugin::Barcode - plugin to generate various bar codes
+
+SYNOPSIS
+
+In your Main Config File or ZofCMS Template:
+
+    plugins => [
+        qw/Barcode/
+    ],
+
+    # direct output to browser with default values for optional arguments
+    plug_barcode => {
+        code => '12345678901',
+    },
+
+    # or
+
+    # save to file with all options set
+    plug_barcode => {
+        code    => '12345678901',
+        file    => 'bar.png',
+        type    => 'UPCA', # default
+        format  => 'png',  # default
+        no_text => 0,      # default
+        height  => 50,     # default
+    },
+
+In your HTML::Template template (in case errors occur):
+
+    <tmpl_if name='plug_barcode_error'>
+        <p>Error: <tmpl_var escape='html' name='plug_barcode_error'></p>
+    </tmpl_if>
+
+DESCRIPTION
+
+The module is a plugin for L<App::ZofCMS> that provides means to generate various
+types of barcodes and either output them directly to the browser or save them as
+an image.
+
+This documentation assumes you've read L<App::ZofCMS>, L<App::ZofCMS::Config> and
+L<App::ZofCMS::Template>
+
+FIRST-LEVEL ZofCMS TEMPLATE AND MAIN CONFIG FILE KEYS
+
+C<plugins>
+
+    plugins => [
+        qw/Barcode/
+    ],
+
+B<Mandatory>.
+You need to add the plugins to the list of plugins to execute. B<Note:> if you're outputting
+directly to the browser instead of saving the barcode into a file, the B<plugin will call
+exit() as soon as it finishes print()ing the image UNLESS an error occured>, so make sure to
+run anything that needs to be run before that point.
+
+C<plug_barcode>
+
+    # direct output to browser with default values for optional arguments
+    plug_barcode => {
+        code => '12345678901',
+    },
+
+    # save to file with all options set
+    plug_barcode => {
+        code    => '12345678901',
+        file    => 'bar.png',
+        type    => 'UPCA', # default
+        format  => 'png',  # default
+        no_text => 0,      # default
+        height  => 50,     # default
+    },
+
+    # set config with a sub
+    plug_barcode => sub {
+        my ( $t, $q, $config ) = @_;
+    }
+
+B<Mandatory>. Specifies plugin's options. Takes a hashref or a subref as a value. If subref is
+specified,
+its return value will be assigned to C<plug_barcode> as if it was already there. If sub returns
+an C<undef>, then plugin will stop further processing. The C<@_> of the subref will
+contain (in that order): ZofCMS Tempalate hashref, query parameters hashref and
+L<App::ZofCMS::Config> object. Possible keys/values of the hashref
+are as follows:
+
+C<code>
+
+    plug_barcode => {
+        code    => '12345678901',
+    },
+
+    # or
+
+    plug_barcode => {
+        code    => sub {
+            my ( $t, $q, $config ) = @_;
+            return '12345678901';
+        }
+    },
+
+B<Mandatory>. Takes either a string or a subref as a value. If the value is a subref,
+it will be called and its value will be assigned to C<code> as if it was already there.
+The C<@_> of the subref will contain (in this order): ZofCMS Template hashref, query
+parameters hashref and L<App::ZofCMS::Config> object.
+
+Specifies the code for the barcode to generate. Valid values depend
+on the C<type> of the barcode you're generating. If value is an invalid barcode, plugin
+will error out (see C<ERROR HANDLING> section below). If value is either C<undef>
+or an empty string, plugin will stop further processing (no exit()s)
+
+C<file>
+
+    plug_barcode => {
+        code    => '12345678901',
+        file    => 'bar.png',
+    },
+
+B<Optional>. Takes a string that represents the name of the file (relative to C<index.pl>)
+into which to save the image. When is not defined (or set to an empty string) the plugin
+will print out the right C<Content-type> header and output the image right into the browser
+B<and then will call exit() UNLESS an error occured> . Plugin will B<NOT> call C<exit()> if
+saving to the file. B<By default> is not specified (output barcode image directly to the
+browser).
+
+C<type>
+
+    plug_barcode => {
+        code    => '12345678901',
+        type    => 'UPCA',
+    },
+
+    # or
+    plug_barcode => {
+        code    => '12345678901',
+        type    => sub {
+            my ( $t, $q, $config ) = @_;
+            return 'UPCA';
+        },
+    },
+
+B<Optional>. Takes a string or a subref as a value. If the value is a subref,
+it will be called and its value will be assigned to C<type> as if it was already there.
+The C<@_> of the subref will contain (in this order): ZofCMS Template hashref, query
+parameters hashref and L<App::ZofCMS::Config> object.
+
+Represents the type of barcode to generate.
+See L<GD::Barcode> distribution for possible types. B<As of this writing> these are currently
+available types:
+
+    COOP2of5
+    Code39
+    EAN13
+    EAN8
+    IATA2of5
+    ITF
+    Industrial2of5
+    Matrix2of5
+    NW7
+    QRcode
+    UPCA
+    UPCE
+
+If value is either C<undef> or an empty string, plugin will stop further processing (no exit()s)
+B<Defaults to:> C<UPCA>
+
+C<format>
+
+    plug_barcode => {
+        code    => '12345678901',
+        format  => 'png',
+    },
+
+B<Optional>. Can be set to either string C<png> or C<gif> (case sensitive).
+Specifies the format of the image to generate (C<png> is for PNG images and C<gif> is for GIF
+images). B<Defaults to:> C<png>
+
+C<no_text>
+
+    plug_barcode => {
+        code    => '12345678901',
+        no_text => 0,
+    },
+
+B<Optional>. Takes either true or false values. When set to a true value, the plugin
+will not generate text (i.e. it will only make the barcode lines) in the output image.
+B<Defaults to:> C<0>
+
+C<height>
+
+    plug_barcode => {
+        code    => '12345678901',
+        height  => 50,
+    },
+
+B<Optional>. Takes positive integer numbers as a value. Specifies the height of the
+generated barcode image. B<Defaults to:> C<50>
+
+ERROR HANDLING
+
+    <tmpl_if name='plug_barcode_error'>
+        <p>Error: <tmpl_var escape='html' name='plug_barcode_error'></p>
+    </tmpl_if>
+
+In an error occurs while generating the barcode (i.e. wrong code length was specified
+or some I/O error occured if saving to a file), the plugin will set
+the C<< $t->{t}{plug_barcode_error} >> (where C<$t> is ZofCMS Template hashref)
+to the error message.
+
+SEE ALSO
+
+L<GD::Barcode>
+
+
+=head1 App::ZofCMS::Plugin::Base (version 0.0106)
 
 NAME
 
@@ -297,9 +811,11 @@ SYNOPSIS
     use base 'App::ZofCMS::Plugin::Base';
 
     sub _key { 'plug_example' }
-    sub _defaults { qw/foo bar baz beer/ }
+    sub _defaults {
+        qw/foo bar baz beer/
+    }
     sub _do {
-        my ( $self, $conf, $template, $query, $config ) = @_;
+        my ( $self, $conf, $t, $q, $config ) = @_;
     }
 
 DESCRIPTION
@@ -310,7 +826,7 @@ L<App::ZofCMS::Config> and L<App::ZofCMS::Template>
 
 The base class (currently) is only for plugins who take their "config" as a single
 first-level key in either Main Config File or ZofCMS Template. That key's value
-must be a hashref.
+must be a hashref or a subref that returns a hashref or C<undef>.
 
 SUBS TO OVERRIDE
 
@@ -320,7 +836,10 @@ C<_key>
 
 The C<_key> needs to return a scalar contain the name of first level key in ZofCMS template
 or Main Config file. Study the source code of this module to find out what it's used for
-if it's still unclear.
+if it's still unclear. The value of that key can be either a hashref or a subref that returns
+a hashref or undef. If the value is a subref, its return value will be assigned to the key
+and its C<@_> will contain (in that order): C<$t, $q, $conf> where C<$t> is ZofCMS Template
+hashref, C<$q> is hashref of query parameters and C<$conf> is L<App::ZofCMS::Config> object.
 
 C<_defaults>
 
@@ -347,8 +866,66 @@ MOAR!
 
 Feel free to email me the requests for extra functionality for this base class.
 
+DOCUMENTATION FOR PLUGINS
 
-=head1 App::ZofCMS::Plugin::BasicLWP (version 0.0102)
+Below is a "template" documentation. If you're going to use it, make sure to read
+through the entire thing as some things may not apply to your plugin; I've added those
+bits as they are very common in the plugins that I write, some of them (but not all)
+I marked with word C<[EDIT]>
+
+    =head1 DESCRIPTION
+
+    The module is a plugin for L<App::ZofCMS> that provides means to [EDIT].
+
+    This documentation assumes you've read L<App::ZofCMS>, L<App::ZofCMS::Config> and L<App::ZofCMS::Template>
+
+    =head1 FIRST-LEVEL ZofCMS TEMPLATE AND MAIN CONFIG FILE KEYS
+
+    =head2 C<plugins>
+
+        plugins => [
+            { [EDIT] => 2000 },
+        ],
+
+    B<Mandatory>. You need to include the plugin in the list of plugins to execute.
+
+    =head2 C<[EDIT]>
+
+        [EDIT] => {
+        },
+
+        # or
+        [EDIT] => sub {
+            my ( $t, $q, $config ) = @_;
+        },
+
+    B<Mandatory>. Takes either a hashref or a subref as a value. If subref is specified,
+    its return value will be assigned to C<[EDIT]> as if it was already there. If sub returns
+    an C<undef>, then plugin will stop further processing. The C<@_> of the subref will
+    contain (in that order): ZofCMS Tempalate hashref, query parameters hashref and
+    L<App::ZofCMS::Config> object. [EDIT]. Possible keys/values for the hashref
+    are as follows:
+
+    =head3 C<cell>
+
+        [EDIT] => {
+            cell => 't',
+        },
+
+    B<Optional>. Specifies ZofCMS Template first-level key where to [EDIT]. Must be
+    pointing to either a hashref or an C<undef> (see C<key> below). B<Defaults to:> C<t>
+
+    =head3 C<key>
+
+        [EDIT] => {
+            key => '[EDIT]',
+        },
+
+    B<Optional>. Specifies ZofCMS Template second-level key where to [EDIT]. This key will
+    be inside C<cell> (see above)>. B<Defaults to:> C<[EDIT]>
+
+
+=head1 App::ZofCMS::Plugin::BasicLWP (version 0.0104)
 
 NAME
 
@@ -410,7 +987,12 @@ C<plug_basic_lwp>
     }
 
 The plugin won't run unless C<plug_basic_lwp> first-level key is present either in Main
-Config File or ZofCMS Template. Takes a hashref as a value. If the same keys are specified
+Config File or ZofCMS Template. Takes a hashref or a subref as a value. If subref is
+specified,
+its return value will be assigned to C<plug_basic_lwp> as if it was already there. If sub returns
+an C<undef>, then plugin will stop further processing. The C<@_> of the subref will
+contain (in that order): ZofCMS Tempalate hashref, query parameters hashref and
+L<App::ZofCMS::Config> object. If the same keys are specified
 in both Main Config File and ZofCMS Template, then the value set in ZofCMS template will
 take precedence. The possible keys/values of that hashref are as follows:
 
@@ -500,7 +1082,307 @@ The code below assumes default values for C<t_name> and C<t_key> arguments (see 
     </tmpl_if>
 
 
-=head1 App::ZofCMS::Plugin::BreadCrumbs (version 0.0102)
+=head1 App::ZofCMS::Plugin::BoolSettingsManager (version 0.0101)
+
+NAME
+
+
+Link: L<App::ZofCMS::Plugin::BoolSettingsManager>
+
+
+
+App::ZofCMS::Plugin::BoolSettingsManager - Plugin to let individual users manage boolean settings
+
+SYNOPSIS
+
+In L<HTML::Template> template:
+
+    <tmpl_var name='plug_bool_settings_manager_form'>
+
+In ZofCMS Template:
+
+    plugins => [
+        qw/BoolSettingsManager/,
+    ],
+
+    plug_bool_settings_manager => {
+        settings => [
+            notice_forum         => q|new forum posts|,
+            notice_flyers        => q|new flyer uploads|,
+            notice_photo_library => q|new images added to Photo Library|,
+        ],
+
+        # everything below is optional; default values are shown
+        dsn           => "DBI:mysql:database=test;host=localhost",
+        user          => '',
+        pass          => undef,
+        opt           => { RaiseError => 1, AutoCommit => 1 },
+        table         => 'users',
+        login_col     => 'login',
+        login         => sub { $_[0]->{d}{user}{login} },
+        submit_button => q|<input type="submit" class="input_submit"|
+                            . q| value="Save">|,
+    },
+
+DESCRIPTION
+
+The module is a plugin for L<App::ZofCMS> that provides means to present
+a user a form with a number of checkboxes that control boolean settings,
+which are stored in a SQL database.
+
+This documentation assumes you've read L<App::ZofCMS>, 
+L<App::ZofCMS::Config> and L<App::ZofCMS::Template>.
+
+FIRST-LEVEL ZofCMS TEMPLATE AND MAIN CONFIG FILE KEYS
+
+C<plugins>
+
+    plugins => [ qw/BoolSettingsManager/ ],
+
+B<Mandatory>. You need to include the plugin in the list of plugins
+to execute.
+
+C<plug_bool_settings_manager>
+
+    plug_bool_settings_manager => {
+        settings => [
+            notice_forum         => q|new forum posts|,
+            notice_flyers        => q|new flyer uploads|,
+            notice_photo_library => q|new images added to Photo Library|,
+        ],
+
+        # everything below is optional; default values are shown
+        dsn           => "DBI:mysql:database=test;host=localhost",
+        user          => '',
+        pass          => undef,
+        opt           => { RaiseError => 1, AutoCommit => 1 },
+        table         => 'users',
+        login_col     => 'login',
+        login         => sub { $_[0]->{d}{user}{login} },
+        submit_button => q|<input type="submit" class="input_submit"|
+                            . q| value="Save">|,
+    },
+
+B<Mandatory>. Takes either a hashref or a subref as a value.
+If subref is specified, its return value will be assigned to
+C<plug_user_login_forgot_password> key as if it was already there.
+If sub returns an C<undef>, then plugin will stop further processing.
+The C<@_> of the subref will contain C<$t>, C<$q>, and C<$config>
+(in that order), where C<$t> is ZofCMS Template hashref,
+C<$q> is query parameters hashref, and C<$config> is the
+L<App::ZofCMS::Config> object. Possible keys/values for the hashref
+are as follows:
+
+C<settings>
+
+    plug_bool_settings_manager => {
+        settings => [
+            notice_forum         => q|new forum posts|,
+            notice_flyers        => q|new flyer uploads|,
+            notice_photo_library => q|new images added to Photo Library|,
+        ],
+    ...
+
+    plug_bool_settings_manager => {
+        settings => sub {
+            my ( $t, $q, $config ) = @_;
+            return $arrayref_to_assing_to_settings;
+        },
+    ...
+
+B<Mandatory>. Takes an arrayref or a subref as a value. If subref is 
+specified, its return value must be either an arrayref or 
+C<undef> (or empty list). The C<@_> of the subref will contain C<$t>, 
+C<$q>, and C<$config> (in that order), where C<$t> is ZofCMS Template 
+hashref, C<$q> is query parameters hashref, and C<$config> is the
+L<App::ZofCMS::Config> object.
+
+If C<settings> is not specified, or its arrayref is empty, or if the subref 
+returns C<undef>, empty arrayref or empty list, plugin will stop further
+execution.
+
+The arrayref must have an even number of elements that are to be thought
+of as keys and values (the arrayref is used to preserve order). The "keys"
+of the arrayref represent boolean column names in C<table> (see below)
+SQL table in which users' settings are stored (one setting per column).
+The keys will also be used as parts of C<id=""> attributes in the form, thus
+they need to also conform to HTML spec (L<http://xrl.us/bicips>)
+(or whatever your markup language of choice is).
+
+The "values" must be strings that represent the human readable description
+of their corresponding "keys". These will be shown as text in the C<< 
+<label> >>s for corresponding checkboxes.
+
+C<dsn>
+
+    plug_bool_settings_manager => {
+        dsn => "DBI:mysql:database=test;host=localhost",
+    ...
+
+B<Optional, but the default is pretty useless>.
+The C<dsn> key will be passed to L<DBI>'s
+C<connect_cached()> method, see documentation for L<DBI> and
+C<DBD::your_database> for the correct syntax for this one.
+The example above uses MySQL database called C<test> which is
+located on C<localhost>.
+B<Defaults to:> C<"DBI:mysql:database=test;host=localhost">
+
+C<user>
+
+    plug_bool_settings_manager => {
+        user => '',
+    ...
+
+B<Optional>. Specifies the user name (login) for the database. This can be 
+an empty string if, for example, you are connecting using SQLite 
+driver. B<Defaults to:> C<''> (empty string)
+
+C<pass>
+
+    plug_bool_settings_manager => {
+        pass => undef,
+    ...
+
+B<Optional>. Same as C<user> except specifies the password for the
+database. B<Defaults to:> C<undef> (no password)
+
+C<opt>
+
+    plug_bool_settings_manager => {
+        opt => { RaiseError => 1, AutoCommit => 1 },
+    ...
+
+B<Optional>. Will be passed directly to L<DBI>'s C<connect_cached()> method
+as "options". B<Defaults to:> C<< { RaiseError => 1, AutoCommit => 1 } >>
+
+C<table>
+
+    plug_bool_settings_manager => {
+        table => 'users',
+    ...
+
+B<Optional>. Takes a string as a value that specifies the name of the
+table in which users' logins and their settings are stored.
+B<Defaults to:> C<users>
+
+C<login_col>
+
+    plug_bool_settings_manager => {
+        login_col => 'login',
+    ...
+
+B<Optional>. Takes a string as a value that specifies the name of the
+column in C<table> table that contains users' logins.
+B<Defaults to:> C<login>
+
+C<login>
+
+    plug_bool_settings_manager => {
+        login => sub {
+            my ( $t, $q, $config ) = @_;
+            return $t->{d}{user}{login};
+        },
+    ...
+
+    plug_bool_settings_manager => {
+        login => 'zoffix',
+    ...
+
+B<Optional>. Takes an C<undef>, a subref or a scalar as a value.
+Specifies the login of a current user. This is the value located in the
+C<login_col> (see above) column. This will be used to look up/store the
+settings. If a subref is specified, its return value must be either an
+C<undef> or a scalar, which will be assigned to C<login> as if it was
+already there. If C<login> is set to C<undef> (or the sub returns an
+C<undef>/empty list), then plugin will stop further execution. The C<@_> of
+the subref will contain C<$t>, C<$q>, and C<$config> (in that order), where
+C<$t> is ZofCMS Template hashref, C<$q> is query parameters hashref, and
+C<$config> is the L<App::ZofCMS::Config> object. B<Defaults to:>
+C<< sub { $_[0]->{d}{user}{login} } >>
+
+C<submit_button>
+
+    plug_bool_settings_manager => {
+        submit_button => q|<input type="submit" class="input_submit"|
+                            . q| value="Save">|,
+    ...
+
+B<Optional>. Takes HTML code as a value, which represents the submit
+button to be used on the settings-changing form. Feel free to throw in
+any extra code into this argument. B<Defaults to:>
+C<< <input type="submit" class="input_submit" value="Save"> >>
+
+HTML::Template TEMPLATE VARIABLE
+
+All of plugin's output is spit out into a single variable in your
+L<HTML::Template> template:
+
+    <tmpl_var name='plug_bool_settings_manager_form'>
+
+HTML CODE GENERATED BY THE PLUGIN
+
+The HTML code below was generated after saving settings in the form
+generated using this plugin's C<settings> argument:
+
+    settings => [
+        notice_forum         => q|new forum posts|,
+        notice_flyers        => q|new flyer uploads|,
+        notice_photo_library => q|new images added to Photo Library|,
+    ],
+
+Notice the "keys" in the C<settings> arrayref are used to generate
+C<id=""> attributes on the C<< <li> >> and C<< <input> >> elements
+(and C<for=""> attribute on C<< <label> >>s). The value for C<page>
+hidden C<< <input> >> is derived by the plugin automagically.
+
+    <p class="success-message">Successfully saved</p>
+
+    <form action="" method="POST" id="plug_bool_settings_manager_form">
+    <div>
+        <input type="hidden" name="page" value="/index">
+        <input type="hidden" name="pbsm_save_settings" value="1">
+
+        <ul>
+            <li id="pbsm_container_notice_forum">
+                <input type="checkbox"
+                    id="pbsm_notice_forum"
+                    name="notice_forum"
+                ><label for="pbsm_notice_forum"
+                    class="checkbox_label"> new forum posts</label>
+            </li>
+            <li id="pbsm_container_notice_flyers">
+                <input type="checkbox"
+                    id="pbsm_notice_flyers"
+                    name="notice_flyers"
+                ><label for="pbsm_notice_flyers"
+                    class="checkbox_label"> new flyer uploads</label>
+            </li>
+            <li id="pbsm_container_notice_photo_library">
+                <input type="checkbox"
+                    id="pbsm_notice_photo_library"
+                    name="notice_photo_library"
+                    checked
+                ><label for="pbsm_notice_photo_library"
+                    class="checkbox_label"> new images added to Photo Library</label>
+            </li>
+        </ul>
+        <input type="submit" class="input_submit" value="Save">
+    </div>
+    </form>
+
+The C<< <p class="success-message">Successfully saved</p> >> paragraph
+is only shown when user saves their settings.
+
+REQUIRED MODULES
+
+Plugin requires the following modules to survive:
+
+    App::ZofCMS::Plugin::Base => 0.0106,
+    HTML::Template            => 2.9,
+    DBI                       => 1.607,
+
+
+=head1 App::ZofCMS::Plugin::BreadCrumbs (version 0.0103)
 
 NAME
 
@@ -586,7 +1468,9 @@ C<breadcrumbs>
     },
 
 The C<breadcrumbs> first-level ZofCMS template key controls the behaviour
-of the plugin. The key takes a hashref as a value.
+of the plugin. Can be specified as the first-level key in Main Config File, but unlike many
+other plugins the hashref keys do NOT merge; i.e. if you set the key in both files, the value
+in ZofCMS Template will take precedence. The key takes a hashref as a value.
 Do B<NOT> specify this key if you wish to use all the
 defaults, as specifying an I<empty hashref> as a value will B<disable> the
 plugin for that given page. Possible keys/values of that hashref are as
@@ -678,6 +1562,237 @@ The plugin set one key - C<breadcrumbs> - in C<{t}> special key which
 means that you can stick C<< <tmpl_var name="breadcrumbs"> >> in any
 of your L<HTML::Template> templates and this is where the breadcrumbs
 will be placed.
+
+
+=head1 App::ZofCMS::Plugin::Captcha (version 0.0102)
+
+NAME
+
+
+Link: L<App::ZofCMS::Plugin::Captcha>
+
+
+
+App::ZofCMS::Plugin::Captcha - plugin to utilize security images (captchas)
+
+SYNOPSIS
+
+    plugins => [
+        { Session => 1000 },
+        { Captcha => 2000 },
+    ],
+    plugins2 => [
+        qw/Session/
+    ],
+
+    plug_captcha => {},
+
+    # Session plugin configuration (i.e. database connection is left out for brevity)
+
+DESCRIPTION
+
+The module is a plugin for L<App::ZofCMS> that provides means to generate and display
+security images, known as "captchas" (i.e. protecting forms from bots).
+
+The plugin was coded with idea that you will be using L<App::ZofCMS::Plugin::Session>
+along with it to store the generated random string; however, it's not painfully
+necessary to use Session plugin (just easier with it).
+
+This documentation assumes you've read L<App::ZofCMS>, L<App::ZofCMS::Config> and L<App::ZofCMS::Template>
+
+FIRST-LEVEL ZofCMS TEMPLATE AND MAIN CONFIG FILE KEYS
+
+C<plugins>
+
+    plugins => [
+        { Session => 1000 },
+        { Captcha => 2000 },
+    ],
+    plugins2 => [
+        qw/Session/
+    ],
+
+B<Mandatory>. You need to include the plugin in the list of plugins to execute. I'm using
+Session plugin here to first load existing session and after Captcha is ran, to save
+the session.
+
+C<plug_captcha>
+
+    # all defaults
+    plug_captcha => {},
+
+    # set all arguments
+    plug_captcha => {
+        string  => 'Zoffix Znet Roxors',
+        file    => 'captcha.gif',
+        width   => 80,
+        height  => 20,
+        lines   => 5,
+        particle => 0,
+        no_exit => 1,
+        style   => 'rect',
+        format  => 'gif',
+        tcolor  => '#895533',
+        lcolor  => '#000000',
+    },
+
+    # or set some via a subref
+    plug_captcha => sub {
+        my ( $t, $q, $config ) = @_;
+        return {
+            string  => 'Zoffix Znet Roxors',
+            file    => 'captcha.gif',
+        }
+    },
+
+B<Mandatory>. Takes either a hashref or a subref as a value. If subref is specified,
+its return value will be assigned to C<plug_captcha> as if it was already there. If
+sub returns an C<undef>, then plugin will stop further processing.
+The C<@_> of the subref will
+contain (in that order): ZofCMS Tempalate hashref, query parameters hashref and
+L<App::ZofCMS::Config> object. To run the plugin with all the defaults,
+use an empty hashref. Possible keys/values for the hashref
+are as follows:
+
+C<string>
+
+    plug_captcha => {
+        string  => 'Zoffix Znet Roxors',
+    },
+
+B<Optional>. Specifies the captcha string. Takes either a scalar string or C<undef>.
+If set to C<undef>, the plugin will generate a random numeric string. B<Defaults to:>
+C<undef>.
+
+C<file>
+
+    plug_captcha => {
+        file    => 'captcha.gif',
+    },
+
+B<Optional>. Takes either a scalar string or C<undef> as a value. If set to a string,
+it represents the name of the file into which to save the captcha image (relative to
+C<index.pl>). If set to C<undef>, plugin will output correct HTTP headers and the image
+directly into the browser. B<Defaults to:> C<undef>.
+
+C<no_exit>
+
+    plug_captcha => {
+        no_exit => 1,
+    },
+
+B<Optional>. This one is relevant only when C<file> (see above) is set to C<undef>.
+Takes either true or false values. If set to a B<false value>, plugin will call
+C<exit()> as soon as it finishes outputting the image to the browser. You'd use it
+if you're generating your own string and are able to store it with the Session plugin
+before Captcha plugin runs. If set to a B<true value>, plugin will not call C<exit()> and
+the runcycle will continue; this way the Captcha plugin generated random string can
+be stored by Session plugin later in the runlevel. B<Note:> that in this case, after the
+image is printed the browser will also send some garbage (and by that I mean the
+standard HTTP Content-type headers that ZofCMS prints along with whatever may be in
+your template); even though I haven't noticed that causing any problems with the image,
+if it does cause broken image for you, simply use L<App::ZofCMS::Plugin::Sub> and call
+C<exit()> within it. B<Defaults to:> C<1>
+
+C<width>
+
+    plug_captcha => {
+        width   => 80,
+    },
+
+B<Optional>. Takes a pisitive integer as a value. Specifies captcha image's width in pixels.
+B<Defaults to:> C<80>
+
+C<height>
+
+    plug_captcha => {
+        height  => 20,
+    },
+
+B<Optional>. Takes a pisitive integer as a value. Specifies captcha image's height in
+pixels.B<Defaults to:> C<20>
+
+C<lines>
+
+    plug_captcha => {
+        lines   => 5,
+    },
+
+B<Optional>. Specifies the number of crypto-lines to generate. See L<GD::SecurityImage> for
+more details. B<Defaults to:> C<5>
+
+C<particle>
+
+    plug_captcha => {
+        particle => 0, # disable particles
+    },
+
+    plug_captcha => {
+        particle => 1, # let plugin decide the right amount
+    },
+
+    plug_captcha => {
+        particle => [40, 50], # set amount yourself
+    },
+
+B<Optional>. Takes either false values, true values or an arrayref as a value. When set to an
+arrayref, the first element of it is density and the second one is maximum
+number of dots to generate - these dots will add more cryptocrap to your captcha. See
+C<particle()> method in L<GD::SecurityImage> for more details. When set to a true value
+that is not an arrayref, L<GD::SecurityImage> will try to determine optimal number of
+particles. When set to a false value, no extra particles will be created.
+B<Defaults to:> C<0>
+
+C<style>
+
+    plug_captcha => {
+        style   => 'rect',
+    },
+
+B<Optional>. Specifies the cryptocrap style of captcha.
+See L<GD::SecurityImage> C<create()> method for possible styles.
+B<Defaults to:> C<rect>
+
+C<format>
+
+    plug_captcha => {
+        format  => 'gif',
+    },
+
+B<Optional>. Takes string C<gif>, C<jpeg> or C<png> as a value. Specifies the format
+of the captcha image. Some formats may be unavailable depending on your L<GD> version.
+B<Defaults to:> C<gif>
+
+C<tcolor>
+
+    plug_captcha => {
+        tcolor  => '#895533',
+        lcolor  => '#000000',
+    },
+
+B<Optional>. Takes 6-digit hex RGB notation as a value. Specifies the color
+of the text (and particles if they are on). B<Defaults to:> C<#895533>
+
+C<lcolor>
+
+    plug_captcha => {
+        lcolor  => '#000000',
+    },
+
+B<Optional>. Takes 6-digit hex RGB notation as a value. Specifies the color
+of cryptocrap lines. B<Defaults to:> C<#000000>
+
+OUTPUT
+
+    $t->{d}{session}{captcha} = 'random_number';
+
+    $t->{t}{plug_captcha_error} = 'error message';
+
+Plugin will put the captcha string into C<< $t->{d}{session}{captcha} >> where
+C<$t> is ZofCMS Template hashref. Currently there is no way to change that.
+
+If you're saving captcha to a file, possible I/O error message will be put into
+C<< $t->{t}{plug_captcha_error} >> where C<$t> is ZofCMS Template hashref.
 
 
 =head1 App::ZofCMS::Plugin::Comments (version 0.0102)
@@ -1161,7 +2276,186 @@ If you set C<plug_redirect> in both Main Config File and ZofCMS Template, the on
 ZofCMS Template will take precedence.
 
 
-=head1 App::ZofCMS::Plugin::Cookies (version 0.0103)
+=head1 App::ZofCMS::Plugin::ConfigToTemplate (version 0.0104)
+
+NAME
+
+
+Link: L<App::ZofCMS::Plugin::ConfigToTemplate>
+
+
+
+App::ZofCMS::Plugin::ConfigToTemplate - plugin to dynamically stuff Main Config File keys into ZofCMS Template
+
+SYNOPSIS
+
+In Main Config File:
+
+    public_config => {
+        name => 'test',
+        value => 'plug_test',
+    },
+
+In ZofCMS Template:
+
+    plugins => [
+        { ConfigToTemplate => 2000 },
+    ],
+
+    plug_config_to_template => {
+        key     => undef,
+        cell    => 't',
+    },
+
+Now we can use `name` and `value` variables in HTML::Template template...
+
+DESCRIPTION
+
+The module is a plugin for L<App::ZofCMS> that technically expands functionality of
+Main Config File's C<template_defaults> special key.
+
+Using this plugin you can dynamically (and more "on demand") stuff keys from Main Config File
+to ZofCMS Template hashref without messing around with other plugins and poking with
+->conf method
+
+This documentation assumes you've read L<App::ZofCMS>, L<App::ZofCMS::Config> and L<App::ZofCMS::Template>
+
+Main Config File and ZofCMS Template First Level Keys
+
+C<plugins>
+
+    plugins => [
+        { ConfigToTemplate => 2000 },
+    ],
+
+You need to include the plugin in the list of plugins to run.
+
+C<plug_config_to_template>
+
+    # these are the default values
+    plug_config_to_template => {
+        cell         => 'd',
+        key          => 'public_config',
+        config_cell  => 'public_config',
+        config_keys  => undef,
+        noop         => 0,
+    }
+
+    plug_config_to_template => sub {
+        my ( $t, $q, $config ) = @_;
+        return {
+            cell         => 'd',
+            key          => 'public_config',
+            config_cell  => 'public_config',
+            config_keys  => undef,
+            noop         => 0,
+        };
+    }
+
+The C<plug_config_to_template> must be present in order for the plugin to run. It takesa
+hashref or a subref as a value. If subref is specified,
+its return value will be assigned to C<plug_config_to_template> as if it was already there. If sub returns
+an C<undef>, then plugin will stop further processing. The C<@_> of the subref will
+contain (in that order): ZofCMS Tempalate hashref, query parameters hashref and
+L<App::ZofCMS::Config> object. Keys of this hashref can be set in either (or both) Main Config File and
+ZofCMS Template - they will be merged together if set in both files; if the same key is set in
+both files, the value set in ZofCMS Template will take precedence. All keys are optional, to
+run the plugins with all the defaults use an empty hashref. Possible keys/values
+are as follows:
+
+C<cell>
+
+    cell => 'd',
+
+B<Optional>. Specifies the cell (first-level key) in ZofCMS Template hashref where to put
+config file data. B<Defaults to:> C<d>
+
+C<key>
+
+    key => 'public_config',
+
+    key => undef,
+
+B<Optional>. Specifies the key in the cell (i.e. the second-level key inside the first-level
+key) of where to put config file data. B<Can be set to> C<undef> in which case data will be
+stuffed right into the cell. B<Defaults to:> C<public_config>
+
+C<config_cell>
+
+    config_cell  => 'public_config',
+
+B<Optional>. Specifies the cell (first-level key) in Main Config File from where to take the
+data. Note that C<config_cell> must point to a hashref. B<Defaults to:> C<public_config>
+
+C<config_keys>
+
+    config_keys  => undef,
+    config_keys  => [
+        qw/foo bar baz/,
+    ],
+
+B<Optional>. Takes either C<undef> or an arrayref. Specifies the keys in the cell (i.e.
+the second-level key inside the first-level key) in Main Config File from where to take the
+data. When set to an arrayref, the elements of the arrayref represent the names of the keys.
+When set to C<undef> all keys will be taken. Note that C<config_cell> must point to
+a hashref. B<Defaults to:> C<undef>
+
+C<noop>
+
+    noop => 0,
+
+B<Optional>. Pneumonic: B<No> B<Op>eration. Takes either true or false values. When set to
+a true value, the plugin will not run. B<Defaults to:> C<0>
+
+EXAMPLES
+
+EXAMPLE 1
+
+    Config File:
+    plug_config_to_template => {}, # all defaults
+
+    public_config => {
+        name => 'test',
+        value => 'plug_test',
+    },
+
+
+    Relevant dump of ZofCMS Template hashref:
+
+    $VAR1 = {
+        'd' => {
+            'public_config' => {
+                'value' => 'plug_test',
+                'name' => 'test'
+            }
+        },
+    };
+
+EXAMPLE 2
+
+    Config File:
+    plug_config_to_template => {
+        key     => undef,
+        cell    => 't',
+    },
+
+    public_config => {
+        name => 'test',
+        value => 'plug_test',
+    },
+
+
+    Relevant dump of ZofCMS Template hashref:
+
+    $VAR1 = {
+        't' => {
+            'value' => 'plug_test',
+            'name' => 'test'
+        }
+    };
+
+
+=head1 App::ZofCMS::Plugin::Cookies (version 0.0104)
 
 NAME
 
@@ -1302,6 +2596,114 @@ thus the result will be:
     Cookie 'foo': bar
 
 That's all there is to it, enjoy!
+
+
+=head1 App::ZofCMS::Plugin::CSSMinifier (version 0.0104)
+
+NAME
+
+
+Link: L<App::ZofCMS::Plugin::CSSMinifier>
+
+
+
+App::ZofCMS::Plugin::CSSMinifier - plugin for minifying CSS files
+
+SYNOPSIS
+
+In your ZofCMS Template or Main Config File:
+
+    plugins => [
+        qw/CSSMinifier/,
+    ],
+
+    plug_css_minifier => {
+        file => 'main.css',
+    },
+
+Now, this page can be linked into your document as a CSS file (it will be minified)
+
+DESCRIPTION
+
+The module is a plugin for L<App::ZofCMS> that provides means to send minified CSS files.
+
+This documentation assumes you've read L<App::ZofCMS>, L<App::ZofCMS::Config> and L<App::ZofCMS::Template>
+
+WTF IS MINIFIED?
+
+Minified means that all the useless stuff (which means whitespace, etc)
+will be stripped off the CSS file to save a few bytes. See L<CSS::Minifier> for more info.
+
+FIRST-LEVEL ZofCMS TEMPLATE AND MAIN CONFIG FILE KEYS
+
+C<plugins>
+
+    plugins => [
+        qw/CSSMinifier/,
+    ],
+
+B<Mandatory>. You need to include the plugin to the list of plugins to execute.
+
+C<plug_css_minifier>
+
+    plug_css_minifier => {
+        file        => 'main.css',
+        auto_output => 1, # default value
+        cache       => 1, # default value
+    },
+
+    plug_css_minifier => sub {
+        my ( $t, $q, $config ) = @_;
+        return {
+            file        => 'main.css',
+            auto_output => 1, # default value
+            cache       => 1, # default value
+        }
+    },
+
+B<Mandatory>. Takes or a subref as a value. If subref is specified,
+its return value will be assigned to C<plug_css_minifier> as if it was already there. If sub returns
+an C<undef>, then plugin will stop further processing. The C<@_> of the subref will
+contain (in that order): ZofCMS Tempalate hashref, query parameters hashref and
+L<App::ZofCMS::Config> object; individual keys can be set in both Main Config
+File and ZofCMS Template, if the same key set in both, the value in ZofCMS Template will
+take precedence. The following keys/values are accepted:
+
+C<file>
+
+    plug_css_minifier => {
+        file        => 'main.css',
+    }
+
+B<Mandatory>. Takes a string as an argument that specifies the name of the CSS file to
+minify. The filename is relative to C<index.pl> file.
+
+C<cache>
+
+    plug_css_minifier => {
+        file        => 'main.css',
+        cache       => 1,
+    },
+
+B<Optional>. Takes either true or false values. When set to a true value the plugin will
+send out an HTTP C<Expires> header that will say that this content expries in like 2038, thus
+B<set this option to a false value while still developing your CSS>. This argument
+has no effect when C<auto_output> (see below) is turned off (set to a false value).
+B<Defaults to:> C<1>
+
+C<auto_output>
+
+    plug_css_minifier => {
+        file        => 'main.css',
+        auto_output => 1,
+    },
+
+B<Optional>. Takes either true or false values. When set to a true value, plugin will
+automatically send C<text/css> C<Content-type> header (along with C<Expires> header if
+C<cache> argument is set to a true value), output the minified CSS file B<and exit()>.
+Otherwise, the minified CSS file will be put into C<< $t->{t}{plug_css_minifier} >>
+where C<$t> is ZofCMS Template hashref and you can do whatever you want with it.
+B<Defaults to:> C<1>
 
 
 =head1 App::ZofCMS::Plugin::DateSelector (version 0.0112)
@@ -1660,7 +3062,7 @@ The following is a sample of the generated code with all the defaults left intac
     </select>
 
 
-=head1 App::ZofCMS::Plugin::DBI (version 0.0312)
+=head1 App::ZofCMS::Plugin::DBI (version 0.0402)
 
 NAME
 
@@ -1751,6 +3153,8 @@ DSN AND CREDENTIALS
         user    => 'test', # user,
         pass    => 'test', # pass
         opt     => { RaiseError => 1, AutoCommit => 0 },
+        last_insert_id => 1,
+        do_dbi_set_first => 1,
     },
 
 You can set these either in your ZofCMS template's C<dbi> key or in your
@@ -1779,6 +3183,34 @@ C<opt>
 The C<opt> key takes a hashref of any additional options you want to
 pass to C<connect_cached> L<DBI>'s method.
 
+C<last_insert_id>
+
+    last_insert_id => 1,
+    last_insert_id => [
+        $catalog,
+        $schema,
+        $table,
+        $field,
+        \%attr,
+    ],
+
+B<Optional>. When set to a true value, the plugin will attempt to figure out the
+C<LAST_INSERT_ID()> after processing C<dbi_set> (see below). The result will be placed
+into C<d> ZofCMS Template special key under key C<last_insert_id> (currently there is no
+way to place it anywhere else). The value of C<last_insert_id> argument can be either a true
+value or an arrayref. Having any true value but an arrayref is the same as having an
+arrayref with three C<undef>s. That arrayref will be directly dereferenced into L<DBI>'s
+C<last_insert_id()> method. See documentation for L<DBI> for more information.
+B<By default is not specified> (false)
+
+C<do_dbi_set_first>
+
+    do_dbi_set_first => 1,
+
+B<Optional>. Takes either true or false values. If set to a true value, the plugin
+will first execute C<dbi_set> and then C<dbi_get>; if set to a false value, the order will
+be reversed (i.e. C<dbi_get> first and then C<dbi_set> will be executed. B<Defaults to:> C<1>
+
 RETRIEVING FROM AND SETTING DATA IN THE DATABASE
 
 In your ZofCMS template the first-level C<dbi> key accepts a hashref two
@@ -1801,6 +3233,20 @@ C<dbi_get>
     }
 
     dbi => {
+        dbi_get => sub {
+            my ( $query, $template, $config, $dbh ) = @_;
+            return {
+                sql     => [
+                    'SELECT * FROM test WHERE id = ?',
+                    { Slice => {} },
+                    $query->{id},
+                ],
+                on_data => 'has_data',
+            }
+        },
+    },
+
+    dbi => {
         dbi_get => [
             {
                 layout  => [ qw/name pass/ ],
@@ -1813,7 +3259,12 @@ C<dbi_get>
         ],
     }
 
-The C<dbi_get> key takes either a hashref or an arrayref as a value.
+The C<dbi_get> key takes either a hashref, a subref or an arrayref as a value.
+If the value is a subref, the subref will be evaluated and its value will be assigned to C<dbi_get>; the C<@_> of that subref will contain the following (in that order):
+C<$query, $template, $config, $dbh> where C<$query> is query string hashref, C<$template> is
+ZofCMS Template hashref, $config is the L<App::ZofCMS::Config> object and C<$dbh> is a
+L<DBI> database handle (already connected).
+
 If the value is a hashref it is the same as having just that hashref
 inside the arrayref. Each element of the arrayref must be a hashref with
 instructions on how to retrieve the data. The possible keys/values of
@@ -1852,6 +3303,17 @@ only one row from the table to be returned you can set C<single> parameter B<to 
 and then the plugin will stuff appropriate values into C<{t}> special hashref where keys will
 be the names you specified in the C<layout> argument and values will be the values of the
 first row that was fetched from the database. B<By default is not specified> (false)
+
+C<single_prefix>
+
+    single_prefix => 'dbi_',
+
+B<Optional>. Takes a scalar as a value. Applies only when 
+C<single> (see above) is set to a true value. The value you specify here
+will be prepended to any key names your C<dbi_get> generates. This is
+useful when you're grabbing a single record from the database and
+dumping it directly into C<t> special key; using the prefix helps
+prevent any name clashes. B<By default is not specified>
 
 C<type>
 
@@ -1976,7 +3438,252 @@ C<$config> is the L<App::ZofCMS::Config> object and C<$dbh> is L<DBI>'s
 database handle object.
 
 
-=head1 App::ZofCMS::Plugin::Debug::Dumper (version 0.0101)
+=head1 App::ZofCMS::Plugin::DBIPPT (version 0.0104)
+
+NAME
+
+
+Link: L<App::ZofCMS::Plugin::DBIPPT>
+
+
+
+App::ZofCMS::Plugin::DBIPPT - simple post-processor for results of DBI plugin queries
+
+SYNOPSIS
+
+In your ZofCMS Template or Main Config file:
+
+    plugins => [
+        { DBI => 2000 },  # use of DBI plugin in this example is optional
+        { DBIPPT => 3000 },
+    ],
+
+    dbi => {
+        # ..connection options are skipped for brevity
+
+        dbi_get => {
+            name => 'comments',
+            sql  => [
+                'SELECT `comment`, `time` FROM `forum_comments`',
+                { Slice => {} },
+            ],
+        },
+    },
+
+    plug_dbippt => {
+        key => 'comments',
+        n   => 'comment',
+        # t => 'time' <---- by default, so we don't need to specify it
+    }
+
+DESCRIPTION
+
+The module is a plugin for L<App::ZofCMS> that provides 
+means to automatically post-process some most common (at least for me)
+post-processing needs when using L<App::ZofCMS::Plugin::DBI>; namely,
+converting numerical output of C<time()> with C<localtime()> as well
+as changing new lines in regular text data into C<br>s while escaping
+HTML Entities.
+
+This documentation assumes you've read L<App::ZofCMS>, 
+L<App::ZofCMS::Config> and L<App::ZofCMS::Template>
+
+DO I HAVE TO USE DBI PLUGIN?
+
+No, you don't have to use L<App::ZofCMS::Plugin::DBI>, 
+C<App::ZofCMS::Plugin::DBIPPT> can be run on any piece of data
+that fits the description of C<< <tmpl_loop> >>. The reason for the
+name and use of L<App::ZofCMS::Plugin::DBI> in my examples here is because
+I only required doing such post-processing as this plugin when I used
+the DBI plugin.
+
+WTF IS PPT?
+
+Ok, the name C<DBIPPT> isn't the most clear choice for the name of
+the plugin, but when I first wrote out the full name I realized that
+the name alone defeats the purpose of the plugin - saving keystrokes -
+so I shortened it from C<DBIPostProcessLargeText> to C<DBIPPT> (the C<L>
+was lost in "translation" as well). If you're suffering from memory
+problems, I guess one way to remember the name is "B<P>lease B<Process>
+B<This>".
+
+FIRST-LEVEL ZofCMS TEMPLATE AND MAIN CONFIG FILE KEYS
+
+C<plugins>
+
+    plugins => [
+        { DBI => 2000 },  # example plugin that generates original data
+        { DBIPPT => 3000 }, # higher run level (priority)
+    ],
+
+You need to include the plugin in the list of plugins to run. Make
+sure to set the priority right so C<DBIPPT> would be run after
+any other plugins generate data for processing.
+
+C<plug_dbippt>
+
+    # run with all the defaults
+    plug_dbippt => {},
+
+    # all arguments specified (shown are default values)
+    plug_dbippt => {
+        cell    => 't',
+        key     => 'dbi',
+        n       => undef,
+        t       => 'time',
+    }
+
+    # derive config via a sub
+    plug_dbippt => sub {
+        my ( $t, $q, $config ) = @_;
+        return {
+            cell    => 't',
+            key     => 'dbi',
+            n       => undef,
+            t       => 'time',
+        };
+    }
+
+B<Mandatory>. Takes a hashref or a subref as a value. If subref is specified,
+its return value will be assigned to C<plug_dbippt> as if it was already there. If sub returns
+an C<undef>, then plugin will stop further processing. The C<@_> of the subref will
+contain (in that order): ZofCMS Tempalate hashref, query parameters hashref and
+L<App::ZofCMS::Config> object. To run with all the defaults,
+use an empty hashref. The keys/values are as follows:
+
+C<cell>
+
+    plug_dbippt => {
+        cell => 't',
+    }
+
+B<Optional>. Specifies the first-level ZofCMS Template hashref key
+under which to look for data to convert. B<Defaults to:> C<t>
+
+C<key>
+
+    plug_dbippt => {
+        key => 'dbi',
+    }
+
+    # or
+    plug_dbippt => {
+        key => [ qw/dbi dbi2 dbi3 etc/ ],
+    }
+    
+    # or
+    plug_dbippt => {
+        key => sub {
+            my ( $t, $q, $config ) = @_;
+            return
+                unless $q->{single};
+
+            return $q->{single} == 1
+            ? 'dbi' : [ qw/dbi dbi2 dbi3 etc/ ];
+        }
+    }
+
+B<Optional>. Takes either
+a string, subref or an arrayref as a value. If the value is a subref,
+that subref will be executed and its return value will be assigned
+to C<key> as if it was already there. The C<@_> will contain
+(in that order) ZofCMS Template hashref, query parameters hashref and
+L<App::ZofCMS::Config> object. Passing (or returning from the sub) 
+a string is the same as passing an arrayref with just that string in it.
+
+Each element of the arrayref specifies the second-level key(s) inside 
+C<cell> first-level key value of which is an arrayref of either hashrefs
+or arrayrefs (i.e. typical output of L<App::ZofCMS::Plugin::DBI>).
+B<Defaults to:> C<dbi>
+
+C<n>
+
+    plug_dbippt => {
+        n => 'comments',
+    }
+    
+    # or
+    plug_dbippt => {
+        n => [ 'comments', 'posts', 'messages' ],
+    }
+
+    # or
+    plug_dbippt => {
+        n => sub {
+            my ( $t, $q, $config ) = @_;
+            return
+                unless $q->{single};
+
+            return $q->{single} == 1
+            ? 'comments' : [ qw/comments posts etc/ ];
+        }
+    }
+
+B<Optional>. Pneumonic: B<n>ew lines. Keys/indexes specified in
+C<n> argument will have HTML entities escaped and new lines converted
+to C<< <br> >> HTML elements.
+
+Takes either a string, subref or an arrayref as a value. If the value is a subref,
+that subref will be executed and its return value will be assigned
+to C<n> as if it was already there. The C<@_> will contain
+(in that order) ZofCMS Template hashref, query parameters hashref and
+L<App::ZofCMS::Config> object. Passing (or returning from the sub) 
+a string is the same as passing an arrayref with just that string in it.
+If set to C<undef> no processing will be done for new lines.
+
+Each element of the arrayref specifies either the B<keys> of the hashrefs
+(for DBI plugin that would be when second element of C<sql> arrayref
+is set to C<< { Slice => {} } >>) or B<indexes> of the arrayrefs
+(if they are arrayrefs). 
+B<Defaults to:> C<undef>
+
+C<t>
+
+    plug_dbippt => {
+        t => undef, # no processing, as the default value is "time"
+    }
+
+    # or
+    plug_dbippt => {
+        t => [ qw/time post_time other_time/ ],
+    }
+
+    # or
+    plug_dbippt => {
+        t => sub {
+            my ( $t, $q, $config ) = @_;
+            return
+                unless $q->{single};
+
+            return $q->{single} == 1
+            ? 'time' : [ qw/time post_time other_time/ ];
+        }
+    }
+
+B<Optional>. Pneumonic: B<t>ime. Keys/indexes specified in
+C<t> argument are expected to point to either C<undef> or empty string, in which case, no conversion will
+be done, or values of C<time()> output
+and what will be done is C<scalar localtime($v)> (where C<$v>) is 
+the original value) run on them and the return is assigned back to
+the original. In other words, they will be converted from C<time> to 
+C<localtime>.
+
+Takes either a string, subref or an arrayref as a value. If the value is a subref,
+that subref will be executed and its return value will be assigned
+to C<t> as if it was already there. The C<@_> will contain
+(in that order) ZofCMS Template hashref, query parameters hashref and
+L<App::ZofCMS::Config> object. Passing (or returning from the sub) 
+a string is the same as passing an arrayref with just that string in it.
+If set to C<undef> no processing will be done.
+
+Each element of the arrayref specifies either the B<keys> of the hashrefs
+(for DBI plugin that would be when second element of C<sql> arrayref
+is set to C<< { Slice => {} } >>) or B<indexes> of the arrayrefs
+(if they are arrayrefs).
+B<Defaults to:> C<time>
+
+
+=head1 App::ZofCMS::Plugin::Debug::Dumper (version 0.0102)
 
 NAME
 
@@ -2270,7 +3977,7 @@ PLEASE! Install a local validator. Tons of people already accessing the one that
 in C<http://w3.org>, don't make the lag worse.
 
 
-=head1 App::ZofCMS::Plugin::DirTreeBrowse (version 0.0102)
+=head1 App::ZofCMS::Plugin::DirTreeBrowse (version 0.0105)
 
 NAME
 
@@ -2353,9 +4060,26 @@ C<plug_dir_tree>
         display_path_separator => '/',
     }
 
-The C<plug_dir_tree> takes a hashref as a value and can be set in either Main Config file or
+    plug_dir_tree => sub {
+        my ( $t, $q, $config ) = @_;
+        return {
+            start                  => 'pics',
+            auto_html              => 'ul_class',
+            re                     => qr/[.]jpg$/,
+            q_name                 => 'dir_tree',
+            t_prefix               => 'dir_tree_',
+            display_path_separator => '/',
+        };
+    }
+
+The C<plug_dir_tree> takes a hashref or subref as a value and can be set in either Main Config file or
 ZofCMS Template file. Keys that are set in both Main Config file and ZofCMS Template file
-will get their values from ZofCMS Template file. Possible keys/values of C<plug_dir_tree>
+will get their values from ZofCMS Template file. If subref is specified,
+its return value will be assigned to C<plug_dir_tree> as if it was already there. If sub returns
+an C<undef>, then plugin will stop further processing. The C<@_> of the subref will
+contain (in that order): ZofCMS Tempalate hashref, query parameters hashref and
+L<App::ZofCMS::Config> object.
+Possible keys/values of C<plug_dir_tree>
 hashref are as follows:
 
 C<start>
@@ -2868,7 +4592,235 @@ NON-CORE PREREQUISITES
 The plugin requires one non-core module: L<Data::Transformer>
 
 
-=head1 App::ZofCMS::Plugin::FileUpload (version 0.0111)
+=head1 App::ZofCMS::Plugin::FileTypeIcon (version 0.0105)
+
+NAME
+
+
+Link: L<App::ZofCMS::Plugin::FileTypeIcon>
+
+
+
+App::ZofCMS::Plugin::FileTypeIcon - present users with pretty icons depending on file type
+
+SYNOPSIS
+
+# first of all, get icon images (they are also in the examples/ dir of this distro)
+
+    wget http://zoffix.com/new/fileicons.tar.gz;tar -xvvf fileicons.tar.gz;rm fileicons.tar.gz;
+
+In your ZofCMS Template or Main Config File:
+
+    plug_file_type_icon => {
+        files => [  # mandatory
+            qw/ foo.png bar.doc beer.pdf /,
+            sub {
+                my ( $t, $q, $conf ) = @_;
+                return 'meow.wmv';
+            },
+        ],
+        # all the defaults for reference:
+        resource    => 'pics/fileicons/',
+        prefix      => 'fileicon_',
+        as_arrayref => 0, # put all files into an arrayref at $t->{t}{ $prefix }
+        only_path   => 0, # i.e. do not generate the <img> element
+        icon_width  => 16,
+        icon_height => 16,
+        code_after  => sub {
+            my ( $t, $q, $conf ) = @_;
+            die "Weeee";
+        },
+        xhtml       => 0,
+    },
+
+In your L<HTML::Template> file:
+
+    <tmpl_var name='fileicon_0'>
+    <tmpl_var name='fileicon_1'>
+    <tmpl_var name='fileicon_2'>
+    <tmpl_var name='fileicon_3'>
+
+DESCRIPTION
+
+The module is a plugin for L<App::ZofCMS> that provides a method to show pretty little icons
+that vary depending on the extension of the file (which is just a string as far as the module
+is concerned).
+
+This documentation assumes you've read L<App::ZofCMS>, L<App::ZofCMS::Config> and
+L<App::ZofCMS::Template>
+
+GETTING THE IMAGES FOR THE ICONS
+
+There are 69 icons plus the "unknown file" icon in an archive that is in examples/ directory
+of this distribution. You can also get it from my website:
+
+    wget http://zoffix.com/new/fileicons.tar.gz;
+    tar -xvvf fileicons.tar.gz;
+    rm fileicons.tar.gz;
+
+As well as the original website from where I got them:
+L<http://www.splitbrain.org/projects/file_icons>
+
+Alternatively, you may want to draw your own icons; in that case, the filenames for the icons
+are made out as C<$lowercase_filetype_extension.png>.
+If you draw some icons yourself and would like to share, feel free to email them to me
+at C<zoffix@cpan.org>. 
+
+These images would obviously need to be placed in web-accessible directory on your website.
+
+FIRST-LEVEL ZofCMS TEMPLATE AND MAIN CONFIG FILE KEYS
+
+C<plugins>
+
+    plugins => [ qw/FileTypeIcon/ ],
+
+You obviously need to include the plugin in the list of plugins to execute. You're likely
+to use this plugin with some other plugins, so make sure to get priority right.
+
+C<plug_file_type_icon>
+
+    plug_file_type_icon => {
+        files => [  # mandatory
+            qw/ foo.png bar.doc beer.pdf /,
+            sub {
+                my ( $t, $q, $conf ) = @_;
+                return 'meow.wmv';
+            },
+        ],
+        # all the defaults for reference:
+        resource    => 'pics/fileicons/',
+        prefix      => 'fileicon_',
+        as_arrayref => 0, # put all files into an arrayref at $t->{t}{ $prefix }
+        only_path   => 0, # i.e. do not generate the <img> element
+        icon_width  => 16,
+        icon_height => 16,
+        code_after  => sub {
+            my ( $t, $q, $conf ) = @_;
+            die "Weeee";
+        },
+        xhtml       => 0,
+    },
+
+    # or set config via a subref
+    plug_file_type_icon => sub {
+        my ( $t, $q, $config ) = @_;
+        return {
+            files => [
+                qw/ foo.png bar.doc beer.pdf /,
+            ],
+        };
+    },
+
+Plugin won't run if C<plug_file_type_icon> is not set or its C<files> key does not contain
+any files. The C<plug_file_type_icon> first-level key takes a hashref or a subref as a value. If subref is specified,
+its return value will be assigned to C<plug_file_type_icon> as if it was already there. If sub returns
+an C<undef>, then plugin will stop further processing. The C<@_> of the subref will
+contain (in that order): ZofCMS Tempalate hashref, query parameters hashref and
+L<App::ZofCMS::Config> object. The
+keys of this hashref can be set in either ZofCMS Template or Main Config Files; keys that are
+set in both files will take their values from ZofCMS Template file. The following keys/values
+are valid in C<plug_file_type_icon>:
+
+C<files>
+
+    files => [
+        qw/ foo.png bar.doc beer.pdf /,
+        { 'beer.doc' => 'doc_file' },
+        sub {
+            my ( $t, $q, $conf ) = @_;
+            return 'meow.wmv';
+        },
+    ],
+
+B<Mandatory>. The C<files> key takes either an arrayref, a subref or a hashref as a value.
+If its value is B<NOT> an arrayref, then it will be converted to an arrayref with just one
+element - the original value.
+
+The elements of C<files> arrayref can be strings, hashrefs or subrefs. If the value is a
+subref, the sub will be executed and its return value will replace the subref. The
+C<@_> of the sub will contain C<$t, $q, $conf> (in that order) where C<$t> is ZofCMS Template
+hashref, C<$q> is a hashref of query parameters and C<$conf> is L<App::ZofCMS::Config> object.
+
+If the element is a hashref, it must contain only one key/value pair and the key will be
+treated as a filename to process and the value will become the name of the key in C<t> ZofCMS
+special key (see C<prefix> key below). If the element is a regular string, then it will be
+treated as a filename to process.
+
+C<resource>
+
+    resource => 'pics/fileicons/',
+
+B<Optional>. Specifies the path to directory with icon images. Must be relative to C<index.pl>
+file and web-accessible, as this path will be used in generating path/filenames to the icons.
+B<Defaults to:> C<pics/fileicons/>
+
+C<prefix>
+
+    prefix => 'fileicon_',
+
+B<Optional>. When the plugin generates path to the icon or the C<< <img> >> element, it
+will stick it into C<t> ZofCMS special key. The C<prefix> key takes a string as a value and
+specifies the prefix to use for keys in C<t> ZofCMS special key. If C<as_arrayref> key
+(see below) is set to a true value, then C<prefix> will specify the name of the key, in
+C<t> ZofCMS special key where to store that arrayref. When the element of C<files> arrayref
+is a hashref, the value of the only key in that hashref will become the name of the
+key in C<t> special key B<WITHOUT> the C<prefix>; otherwise, the name will be constructed
+by using C<prefix> and a counter; the elements of C<files> arrayref that are hashrefs do
+not increase that counter. B<Defaults to:> C<fileicon_> (note that underscore at the end)
+
+C<as_arrayref>
+
+    as_arrayref => 0,
+
+B<Optional>. Takes either true or false values.
+When set to a true value, the plugin will create an arrayref of generated
+C<< <img> >> elements (or just paths) and stick it in C<t> special key under C<prefix> (see above) key. B<Defaults to:> C<0>
+
+C<only_path>
+
+    only_path   => 0,
+
+B<Optional>. Takes either true or false values. When set to a true value, the plugin will
+not generate the code for C<< <img> >> elements, but instead it will only provide paths
+to appropriate icon image. B<Defaults to:> C<0>
+
+C<icon_width> and C<icon_height>
+
+    icon_width  => 16,
+    icon_height => 16,
+
+B<Optional>. All the icon images to which I referred you above are sized 16px x 16px. If you
+are creating your own icons, use C<icon_width> and C<icon_height> keys to set proper
+dimensions. You cannot set different sizes for individual icons, but you can use
+C<Image::Size> in the C<code_after> sub (see below). B<Defaults to:> C<16> (for both)
+
+C<code_after>
+
+    code_after => sub {
+        my ( $t, $q, $conf ) = @_;
+        die "Weeee";
+    },
+
+B<Optional>. Takes a subref as a value, this subref will be run after all filenames in
+C<files> arrayref have been processed. The C<@_> will contain (in that order) C<$t, $q, $conf>
+where C<$t> is ZofCMS Template hashref, C<$q> is hashref of query parameters and
+C<$conf> is L<App::ZofCMS::Config> object. B<By defaults:> is not specified.
+
+C<xhtml>
+
+    xhtml => 0,
+
+B<Optional>. If you wish to close C<< <img> >> elements as to when you're writing XHTML, then
+set C<xhtml> argument to a true value. B<Defaults to:> C<0>
+
+GENERATED HTML CODE
+
+The plugin generates the following HTML code:
+
+<img class="file_type_icon" src="pics/fileicons/png.png" width="16" height="16" alt="PNG file" title="PNG file">
+
+
+=head1 App::ZofCMS::Plugin::FileUpload (version 0.0114)
 
 NAME
 
@@ -2978,12 +4930,32 @@ the plugin will store uploaded files. B<Defaults to:> C<zofcms_upload>
 C<name>
 
     { name => 'foos', }
+    
+    { name => '[rand]', }
+    
+    { name => \1 } # any scalar ref
+    
+    {
+        name => sub {
+            my ( $t, $q, $config ) = @_;
+            return 'file_name.png';
+        },
+    }
 
 B<Optional>. Specifies the name (without the extension)
 of the local file into which save the uploaded file. Special value of
 C<[rand]> specifies that the name should be random, in which case it
 will be created by calling C<rand()> and C<time()> and removing any dots
-from the concatenation of those two. B<Defaults to:> C<[rand]>
+from the concatenation of those two. If a I<scalarref> is specified
+(irrelevant of its value), the plugin will use the filename that the
+browser gave it (relying on L<File::Spec::Functions>'s
+C<splitpath> here; also, note that extension will be obtained
+using C<ext> argument (see below). The C<name> parameter can also take
+a subref, if that's the case, then the C<name> parameter will obtain
+its value from the return value of that subref. The subref's C<@_> will
+contain the following (in that order): ZofCMS Template hashref, hashref
+of query parameters and L<App::ZofCMS::Config> object.
+B<Defaults to:> C<[rand]>
 
 C<ext>
 
@@ -2993,6 +4965,15 @@ B<Optional>. Specifies the extension to use for the name of local file
 into which the upload will be stored. B<By default> is not specified
 and therefore the extension will be obtained from the name of the remote
 file.
+
+C<name_filter>
+
+    { name_filter => qr/Z(?!ofcms)/i, }
+
+B<Optional>. Takes a regex ref (C<qr//>) as a value. Anything
+in the C<path> + C<name> + C<ext> final string (regardles of how each
+of those is obtained) that matches this regex
+will be stripped. B<By default> is not specified.
 
 C<content_type>
 
@@ -3126,7 +5107,7 @@ The C<upload_filename> will be set to directory + name + extension of the
 local file into which the upload was saved.
 
 
-=head1 App::ZofCMS::Plugin::FloodControl (version 0.0101)
+=head1 App::ZofCMS::Plugin::FloodControl (version 0.0103)
 
 NAME
 
@@ -3228,8 +5209,21 @@ C<plug_flood_control>
         },
     }
 
+    plug_flood_control => sub {
+        my ( $t, $q, $config ) = @_;
+        return {
+            dsn             => "DBI:mysql:database=test;host=localhost",
+            user            => 'test',
+            pass            => 'test',
+        };
+    }
+
 Plugin uses C<plug_flood_control> first-level key that can be specified in either (or both)
-Main Config File or ZofCMS Template file. The key takes a hashref as a value. If the keys of
+Main Config File or ZofCMS Template file. The key takes a hashref or a subref as a value. If subref is specified,
+its return value will be assigned to C<plug_flood_control> as if it was already there. If sub returns
+an C<undef>, then plugin will stop further processing. The C<@_> of the subref will
+contain (in that order): ZofCMS Tempalate hashref, query parameters hashref and
+L<App::ZofCMS::Config> object. If the keys of
 that hashref are specified in both files will take their values from ZofCMS Template.
 Most of these keys are optional with sensible defaults. Possible keys/values are as follows:
 
@@ -3368,7 +5362,7 @@ hashref where keys are params' names and values are their values and L<App::ZofC
 object. B<By default> is not specified.
 
 
-=head1 App::ZofCMS::Plugin::FormChecker (version 0.0331)
+=head1 App::ZofCMS::Plugin::FormChecker (version 0.0341)
 
 NAME
 
@@ -3607,7 +5601,13 @@ C<rules>
         },
 
 This is the "heart" of the plugin, the place where you specify the rules for checking.
-The C<rules> key takes a hashref as a value. The keys of that hashref are the names
+The C<rules> key takes a hashref or a subref as a value. If the value is a subref,
+its C<@_> will contain (in that order) ZofCMS Template hashref, query parameters hashref
+and L<App::ZofCMS::Config> object. The return value of the subref will be assigned
+to C<rules> parameter and therefore must be a hashref; alternatively the sub may
+return an C<undef>, in which case the plugin will stop executing.
+
+The keys of C<rules> hashref are the names
 of the query parameters that you wish to check. The values of those keys are the
 "rulesets". The values can be either a string, regex (C<qr//>), arrayref, subref, scalarref
 or a hashref;
@@ -3969,7 +5969,7 @@ if the user edits some fields you have have the preset values along with those c
 by the user.
 
 
-=head1 App::ZofCMS::Plugin::FormMailer (version 0.0201)
+=head1 App::ZofCMS::Plugin::FormMailer (version 0.0222)
 
 NAME
 
@@ -4034,6 +6034,7 @@ C<plug_form_mailer>
             trigger     => [ qw/ d   plug_form_checker_ok / ],
             subject     => 'Zen of Design Account Request',
             to          => 'foo@bar.com',
+            from        => 'Me <me@mymail.com>',
             ok_redirect => 'http://google.com/',
             mailer      => 'testfile',
             format      => <<'END',
@@ -4044,9 +6045,22 @@ C<plug_form_mailer>
     END
         },
 
+
+    plug_form_mailer => sub {
+        my ( $t, $q, $config ) = @_;
+        return {
+            # set plugin config here
+        };
+    },
+
 The plugin will not run unless C<plug_form_mailer> first-level key is set in either Main
 Config File or ZofCMS Template file. The C<plug_form_mailer> first-level key takes a hashref
-as a value. Keys that are set in both Main Config File and ZofCMS Template file will take on
+or a subref as a value. If subref is specified,
+its return value will be assigned to C<plug_form_mailer> as if it was already there. If sub
+returns
+an C<undef>, then plugin will stop further processing. The C<@_> of the subref will
+contain (in that order): ZofCMS Tempalate hashref, query parameters hashref and
+L<App::ZofCMS::Config> object. Keys that are set in both Main Config File and ZofCMS Template file will take on
 their values from ZofCMS Template. Possible keys/values are as follows:
 
 C<format>
@@ -4086,6 +6100,15 @@ B<Mandatory>. Specifies the e-mail address(es) to which to send the e-mails. Tak
 an arrayref or a scalar as a value. Specifying a scalar is the same as specifying
 an arrayref with just that scalar in it. Each element of that arrayref must be a valid
 e-mail address.
+
+C<from>
+
+    from => 'Me <me@mymail.com>',
+
+B<Optional>. Specifies the "From" header to use. Note: in my experience, setting the "From"
+to some funky address would sometimes make the server refuse to send mail; if your mail
+is not being sent, try to leave the C<from> header at the default.B<By default:> not
+specified, thus the "From" will be whatever your server has in stock.
 
 C<trigger>
 
@@ -4272,7 +6295,669 @@ SEE ALSO
 L<DBI>, L<App::ZofCMS::Plugin::DBI>
 
 
-=head1 App::ZofCMS::Plugin::HTMLFactory (version 0.0101)
+=head1 App::ZofCMS::Plugin::GetRemotePageTitle (version 0.0104)
+
+NAME
+
+
+Link: L<App::ZofCMS::Plugin::GetRemotePageTitle>
+
+
+
+App::ZofCMS::Plugin::GetRemotePageTitle - plugin to obtain page titles from remote URIs
+
+SYNOPSIS
+
+In ZofCMS Template or Main Config File:
+
+    plugins => [
+        qw/GetRemotePageTitle/
+    ],
+
+    plug_get_remote_page_title => {
+        uri => 'http://zoffix.com',
+    },
+
+In HTML::Template file:
+
+    <tmpl_if name='plug_remote_page_title_error'>
+        <p class="error">Got error: <tmpl_var escape='html' name='plug_remote_page_title_error'></p>
+    <tmpl_else>
+        <p>Title: <tmpl_var escape='html' name='plug_remote_page_title'></p>
+    </tmpl_if>
+
+DESCRIPTION
+
+The module is a plugin for L<App::ZofCMS> that provides means to get page titles from
+remote URIs which can be utilized when automatically parsing URIs posted in coments, etc.
+
+This documentation assumes you've read L<App::ZofCMS>, L<App::ZofCMS::Config> and
+L<App::ZofCMS::Template>
+
+FIRST-LEVEL ZofCMS TEMPLATE AND MAIN CONFIG FILE KEYS
+
+C<plugins>
+
+    plugins => [
+        qw/GetRemotePageTitle/
+    ],
+
+B<Mandatory>. You must specify the plugin in the list of plugins to execute.
+
+C<plug_get_remote_page_title>
+
+    plug_get_remote_page_title => {
+        uri => 'http://zoffix.com',
+        ua => LWP::UserAgent->new(
+            agent    => "Opera 9.5",
+            timeout  => 30,
+            max_size => 2000,
+        ),
+    },
+
+    plug_get_remote_page_title => sub {
+        my ( $t, $q, $config ) = @_;
+        return {
+            uri => 'http://zoffix.com',
+        };
+    },
+
+B<Mandatory>. Takes either a hashref or a subref as a value. If subref is specified,
+its return value will be assigned to C<plug_get_remote_page_title>
+as if it was already there. If sub returns
+an C<undef>, then plugin will stop further processing. The C<@_> of the subref will
+contain (in that order): ZofCMS Tempalate hashref, query parameters hashref and
+L<App::ZofCMS::Config> object. Possible keys/values for the hashref
+are as follows:
+
+C<uri>
+
+    plug_get_remote_page_title => {
+        uri => 'http://zoffix.com',
+    }
+
+    plug_get_remote_page_title => {
+        uri => [
+            'http://zoffix.com',
+            'http://haslayout.net',
+        ],
+    }
+
+    plug_get_remote_page_title => {
+        uri => sub {
+            my ( $t, $q, $config ) = @_;
+            return 'http://zoffix.com';
+        },
+    }
+
+B<Mandatory>. Specifies URI(s) titles of which you wish to obtain. The value can be either
+a direct string, an arrayref or a subref. When value is a subref, its C<@_> will contain
+(in that order): ZofCMS Template hashref, query parameters hashref and L<App::ZofCMS::Config>
+object. The return value of the sub will be assigned to C<uri> argument as if it was already
+there.
+
+The single string vs. arrayref values affect the output format (see section below).
+
+C<ua>
+
+    plug_get_remote_page_title => {
+        ua => LWP::UserAgent->new(
+            agent    => "Opera 9.5",
+            timeout  => 30,
+            max_size => 2000,
+        ),
+    },
+
+B<Optional>. Takes an L<LWP::UserAgent> object as a value; this object will be used for
+fetching titles from the remote pages. B<Defaults to:>
+
+    LWP::UserAgent->new(
+        agent    => "Opera 9.5",
+        timeout  => 30,
+        max_size => 2000,
+    ),
+
+PLUGIN'S OUTPUT
+
+    # uri argument set to a string
+    <tmpl_if name='plug_remote_page_title_error'>
+        <p class="error">Got error: <tmpl_var escape='html' name='plug_remote_page_title_error'></p>
+    <tmpl_else>
+        <p>Title: <tmpl_var escape='html' name='plug_remote_page_title'></p>
+    </tmpl_if>
+
+
+    # uri argument set to an arrayref
+    <ul>
+        <tmpl_loop name='plug_remote_page_title'>
+        <li>
+            <tmpl_if name='error'>
+                Got error: <tmpl_var escape='html' name='error'>
+            <tmpl_else>
+                Title: <tmpl_var escape='html' name='title'>
+            </tmpl_if>
+        </li>
+        </tmpl_loop>
+    </ul>
+
+Plugin will set C<< $t->{t}{plug_remote_page_title} >> (where C<$t> is ZofCMS Template
+hashref) to either a string or an
+arrayref when C<uri> plugin's argument is set to a string or arrayref respectively. Thus,
+for arrayref values you'd use a C<< <tmpl_loop> >> plugins will use two variables
+inside that loop: C<error> and C<title>; the C<error> variable will be present when
+an error occured during title fetching. The C<title> will be the title of the URI. Order
+for arrayrefs will be the same as the order in C<uri> argument.
+
+If C<uri> argument was set to a single string, then C<{plug_remote_page_title}> will contain
+the actual title of the page and C<{plug_remote_page_title_error}> will be set if an error
+occured.
+
+
+=head1 App::ZofCMS::Plugin::GoogleCalculator (version 0.0103)
+
+NAME
+
+
+Link: L<App::ZofCMS::Plugin::GoogleCalculator>
+
+
+
+App::ZofCMS::Plugin::GoogleCalculator - simple plugin to interface with Google calculator
+
+SYNOPSIS
+
+In ZofCMS Template or Main Config File:
+
+    plugins => [
+        qw/GoogleCalculator/
+    ],
+    plug_google_calculator => {},
+
+In HTML::Template template:
+
+    <form action="" method="POST">
+    <div>
+        <label>Enter an expression: <input type="text" name="calc"></label>
+        <input type="submit" value="Calculate">
+    </div>
+    </form>
+
+    <tmpl_if name='plug_google_calculator_error'>
+        <p class="error">Got error: <tmpl_var escape='html' name='plug_google_calculator_error'></p>
+    <tmpl_else>
+        <p>Result: <tmpl_var escape='html' name='plug_google_calculator'></p>
+    </tmpl_if>
+
+DESCRIPTION
+
+The module is a plugin for L<App::ZofCMS> that provides a simple interface to Google
+calculator (L<http://www.google.com/help/calculator.html>).
+This documentation assumes you've read L<App::ZofCMS>, L<App::ZofCMS::Config> and
+L<App::ZofCMS::Template>
+
+FIRST-LEVEL ZofCMS TEMPLATE AND MAIN CONFIG FILE KEYS
+
+C<plugins>
+
+    plugins => [
+        qw/GoogleCalculator/
+    ],
+
+B<Mandatory>. You need to include the plugin in the list of plugins to execute.
+
+C<plug_google_calculator> 
+
+    plug_google_calculator => {}, # run with all the defaults
+
+
+    plug_google_calculator => {  ## below are the default values
+        from_query => 1,
+        q_name     => 'calc',
+        expr       => undef,
+    }
+
+    plug_google_calculator => sub {  # set configuration via a subref
+        my ( $t, $q, $config ) = @_;
+        return {
+            from_query => 1,
+            q_name     => 'calc',
+            expr       => undef,
+        };
+    }
+
+B<Mandatory>. Takes a hashref or a subref as a value. If subref is specified,
+its return value will be assigned to C<plug_google_calculator> as if it was already there. If sub returns
+an C<undef>, then plugin will stop further processing. The C<@_> of the subref will
+contain (in that order): ZofCMS Tempalate hashref, query parameters hashref and
+L<App::ZofCMS::Config> object. To run with all the defaults, pass an empty hashref.
+Hashref's keys/values are as follows:
+
+C<from_query>
+
+    plug_google_calculator => {
+        from_query  => 1,
+    }
+
+B<Optional>. Takes either true or false values. When set to a true value, the expression
+to calculate will be taken from query parameters and parameter's name will be derived
+from C<q_name> argument (see below). When set to a false value, the expression will
+be taken from C<expr> argument (see below) directly. B<Defaults to:> C<1>
+
+C<q_name>
+
+    plug_google_calculator => {
+        q_name     => 'calc',
+
+B<Optional>. When C<from_query> argument is set to a true value, specifies the name
+of the query parameter from which to gather the expression to calculate.
+B<Defaults to:> C<calc>
+
+C<expr>
+
+    plug_google_calculator => {
+        expr       => '2*2',
+    }
+
+    plug_google_calculator => {
+        expr       => sub {
+            my ( $t, $q, $config ) =  @_;
+            return '2' . $q->{currency} ' in CAD';
+        },
+    }
+
+B<Optional>. When C<from_query> argument is set to a false value, specifies the expression
+to calculate. Takes either a literal expression as a string or a subref as a value.
+When set to a subref, subref will be executed and its return value will be assigned
+to C<expr> as if it was already there (note, C<undef>s will cause the plugin to
+stop further processing). The sub's C<@_> will contain the following (in that order):
+ZofCMS Template hashref, query parameters hashref and L<App::ZofCMS::Config> object.
+B<Defaults to:> C<undef>
+
+PLUGIN OUTPUT
+
+    <tmpl_if name='plug_google_calculator_error'>
+        <p class="error">Got error: <tmpl_var escape='html' name='plug_google_calculator_error'></p>
+    <tmpl_else>
+        <p>Result: <tmpl_var escape='html' name='plug_google_calculator'></p>
+    </tmpl_if>
+
+C<plug_google_calculator>
+
+    <p>Result: <tmpl_var escape='html' name='plug_google_calculator'></p>
+
+If result was calculated successfully, the plugin will set
+C<< $t->{t}{plug_google_calculator} >> to the result string where C<$t> is ZofCMS Template
+hashref.
+
+C<plug_google_calculator_error>
+
+    <tmpl_if name='plug_google_calculator_error'>
+        <p class="error">Got error: <tmpl_var escape='html' name='plug_google_calculator_error'></p>
+    </tmpl_if>
+
+If an error occured during the calculation, C<< $t->{t}{plug_google_calculator_error} >>
+will be set to the error message where C<$t> is ZofCMS Template hashref.
+
+
+=head1 App::ZofCMS::Plugin::GooglePageRank (version 0.0103)
+
+NAME
+
+
+Link: L<App::ZofCMS::Plugin::GooglePageRank>
+
+
+
+App::ZofCMS::Plugin::GooglePageRank - Plugin to show Google Page Ranks
+
+SYNOPSIS
+
+    plugins => [
+        { GooglePageRank => 200 },
+    ],
+
+    # all defaults and URI is set to the current page
+    plug_google_page_rank => {},
+
+    # all options set
+    plug_google_page_rank => {
+        uri => 'zoffix.com',
+        timeout => 20,
+        agent   => 'Opera 9.6',
+        host    => 'suggestqueries.google.com',
+        cell    => 't',
+        key     => 'plug_google_page_rank',
+    },
+
+DESCRIPTION
+
+The module is a plugin for L<App::ZofCMS> that provides means to obtain Google Page Rank.
+This documentation assumes you've read L<App::ZofCMS>, L<App::ZofCMS::Config> and L<App::ZofCMS::Template>
+
+FIRST-LEVEL ZofCMS TEMPLATE AND MAIN CONFIG FILE KEYS
+
+C<plugins>
+
+    plugins => [
+        qw/GooglePageRank/
+    ],
+
+B<Mangatory>. You need to add the plugin to list of plugins to execute.
+
+C<plug_google_page_rank>
+
+    plug_google_page_rank => {
+        uri     => 'zoffix.com',
+        timeout => 20,
+        agent   => 'Opera 9.6',
+        host    => 'suggestqueries.google.com',
+        cell    => 't',
+        key     => 'plug_google_page_rank',
+    },
+
+    plug_google_page_rank => {
+        my ( $t, $q, $config ) = @_;
+        return {
+            uri     => 'zoffix.com',
+            timeout => 20,
+            agent   => 'Opera 9.6',
+            host    => 'suggestqueries.google.com',
+            cell    => 't',
+            key     => 'plug_google_page_rank',
+        };
+    },
+
+B<Mandatory>. Takes a hashref or a subref as a value. If subref is specified,
+its return value will be assigned to C<plug_google_page_rank> as if it was already there. If sub returns
+an C<undef>, then plugin will stop further processing. The C<@_> of the subref will
+contain (in that order): ZofCMS Tempalate hashref, query parameters hashref and
+L<App::ZofCMS::Config> object.
+The C<plug_google_page_rank> first-level key can be set in either (or both)
+ZofCMS Template and Main Config File files. If set in both, the values of keys that are set in
+ZofCMS Template take precedence. Possible keys/values are as follows:
+
+C<uri>
+
+    uri => 'zoffix.com',
+
+    uri => [
+        'zoffix.com',
+        'haslayout.net',
+        'http://zofdesign.com',
+    ],
+
+    uri => sub {
+        my ( $t, $q, $config ) = @_;
+    },
+
+B<Optional>. Takes a string, a coderef or an arrayref of strings each of which would specify
+the page(s) for which to obtain Google Page Rank. If the value is a coderef, then it will
+be exectued and its value will be assigned to C<uri>. The C<@_> will contain (in that order):
+ZofCMS Template hashref, query parameters hashref, L<App::ZofCMS::Config> object.
+B<Defaults to:> if not specified, then the URI of the current page will be calculated. Note
+that this may depend on the server and is made up as:
+C<< 'http://' . $ENV{HTTP_HOST} . $ENV{REQUEST_URI} >>
+
+C<timeout>
+
+    timeout => 20,
+
+B<Optional>. Takes a positive integer as a value. Specifies a Page Rank request
+timeout in seconds. B<Defaults to:> C<20>
+
+C<agent>
+
+    agent => 'Opera 9.6',
+
+B<Optional>. Takes a string as a value that specifies the User-Agent string to use when
+making the requests. B<Defaults to:> C<'Opera 9.6'>
+
+C<host>
+
+    host => 'suggestqueries.google.com',
+
+B<Optional>. Specifies which google host to use for making requests.
+B<Defaults to:> C<suggestqueries.google.com> (B<Note:> if all your queries failing try to set
+this on to C<toolbarqueries.google.com>)
+
+C<cell>
+
+    cell => 't',
+
+B<Optional>. Specifies the first-level key in ZofCMS Template hashref into which to store
+the result. Must point to an C<undef> or a hashref. B<Defaults to:> C<t>
+
+C<key>
+
+    key => 'plug_google_page_rank',
+
+B<Optional>. Specifies the second-level key inside C<cell> first-level key into which
+to put the results. B<Defaults to:> C<plug_google_page_rank>
+
+OUTPUT
+
+Depending on whether the C<uri> argument was set to a string (or not set at all) or an
+arrayref the output will be either a string indicating page's rank or an arrayref of
+hashrefs - enabling you to use a simple C<< <tmpl_loop> >>, each of the hashrefs will contain two keys: C<rank> and C<uri> - the rank of
+the page referenced by that URI.
+
+If there was an error while obtaining the rank (i.e. request timeout) the rank will
+be shown as string C<'N/A'>.
+
+EXAMPLE DUMP 1
+
+    plug_google_page_rank => {
+        uri => [
+            'zoffix.com',
+            'haslayout.net',
+            'http://zofdesign.com',
+            'yahoo.com',
+        ],
+    },
+
+    't' => {
+        'plug_google_page_rank' => [
+            {
+                'rank' => '3',
+                'uri' => 'http://zoffix.com'
+            },
+            {
+                'rank' => '3',
+                'uri' => 'http://haslayout.net'
+            },
+            {
+                'rank' => '3',
+                'uri' => 'http://zofdesign.com'
+            },
+            {
+                'rank' => '9',
+                'uri' => 'http://yahoo.com'
+            }
+        ]
+
+EXAMPLE DUMP 2
+
+    plug_google_page_rank => {
+        uri => 'zoffix.com',
+    },
+
+
+    't' => {
+        'plug_google_page_rank' => '3'
+    }
+
+EXAMPLE DUMP 3
+
+    # URI became http://zcms/ which is a local address and not pageranked
+    plug_google_page_rank => {},
+
+
+    't' => {
+        'plug_google_page_rank' => 'N/A'
+    }
+
+
+=head1 App::ZofCMS::Plugin::GoogleTime (version 0.0103)
+
+NAME
+
+
+Link: L<App::ZofCMS::Plugin::GoogleTime>
+
+
+
+App::ZofCMS::Plugin::GoogleTime - plugin to get times for different locations using Google
+
+SYNOPSIS
+
+In ZofCMS Template or Main Config File:
+
+    plugins => [
+        qw/GoogleTime/
+    ],
+
+    plug_google_time => {
+        location => 'Toronto',
+    },
+
+In HTML::Template file:
+
+    <tmpl_if name='plug_google_time_error'>
+        <p class="error">Got error: <tmpl_var escape='html' name='plug_google_time_error'></p>
+    <tmpl_else>
+        <p>Time: <tmpl_var escape='html' name='plug_google_time'></p>
+    </tmpl_if>
+
+DESCRIPTION
+
+The module is a plugin for L<App::ZofCMS> that provides means to obtain times for different
+locations using Google.
+
+This documentation assumes you've read L<App::ZofCMS>, L<App::ZofCMS::Config> and
+L<App::ZofCMS::Template>
+
+FIRST-LEVEL ZofCMS TEMPLATE AND MAIN CONFIG FILE KEYS
+
+C<plugins>
+
+    plugins => [
+        qw/GoogleTime/
+    ],
+
+B<Mandatory>. You must specify the plugin in the list of plugins to execute.
+
+C<plug_google_time>
+
+    plug_google_time => {
+        location => 'Toronto',
+        ua => LWP::UserAgent->new(
+            agent    => "Opera 9.5",
+            timeout  => 30,
+            max_size => 2000,
+        ),
+    },
+
+    plug_google_time => sub {
+        my ( $t, $q, $config ) = @_;
+        return {
+            location => 'Toronto',
+        }
+    },
+
+B<Mandatory>. Takes either a hashref or a subref as a value. If subref is specified,
+its return value will be assigned to C<plug_google_time> as if it was already there. If sub
+returns
+an C<undef>, then plugin will stop further processing. The C<@_> of the subref will
+contain (in that order): ZofCMS Tempalate hashref, query parameters hashref and
+L<App::ZofCMS::Config> object. Possible keys/values for the hashref
+are as follows:
+
+C<location>
+
+    plug_google_time => {
+        location => 'Toronto',
+    }
+
+    plug_google_time => {
+        location => [
+            'Toronto',
+            'New York',
+        ],
+    }
+
+    plug_google_time => {
+        location => sub {
+            my ( $t, $q, $config ) = @_;
+            return 'Toronto';
+        },
+    }
+
+B<Mandatory>. Specifies location(s) for which you wish to obtain times.
+The value can be either a direct string, an arrayref or a subref.
+When value is a subref, its C<@_> will contain
+(in that order): ZofCMS Template hashref, query parameters hashref and L<App::ZofCMS::Config>
+object. The return value of the sub will be assigned to C<location> argument
+as if it was already there.
+
+The single string vs. arrayref values affect the output format (see section below).
+
+C<ua>
+
+    plug_google_time => {
+        ua => LWP::UserAgent->new(
+            agent    => "Opera 9.5",
+            timeout  => 30,
+        ),
+    },
+
+B<Optional>. Takes an L<LWP::UserAgent> object as a value; this object will be used for
+accessing Google. B<Defaults to:>
+
+    LWP::UserAgent->new(
+        agent    => "Opera 9.5",
+        timeout  => 30,
+    ),
+
+PLUGIN'S OUTPUT
+
+    # location argument set to a string
+    <tmpl_if name='plug_google_time_error'>
+        <p class="error">Got error: <tmpl_var escape='html' name='plug_google_time_error'></p>
+    <tmpl_else>
+        <p>Time: <tmpl_var escape='html' name='plug_google_time'></p>
+    </tmpl_if>
+
+
+    # location argument set to an arrayref
+    <ul>
+        <tmpl_loop name='plug_google_time'>
+        <li>
+            <tmpl_if name='error'>
+                Got error: <tmpl_var escape='html' name='error'>
+            <tmpl_else>
+                Time: <tmpl_var escape='html' name='time'>
+            </tmpl_if>
+        </li>
+        </tmpl_loop>
+    </ul>
+
+Plugin will set C<< $t->{t}{plug_google_time} >> (where C<$t> is ZofCMS Template
+hashref) to either a string or an
+arrayref when C<location> plugin's argument is set to a string or arrayref respectively. Thus,
+for arrayref values you'd use a C<< <tmpl_loop> >> plugins will use three variables
+inside that loop: C<error>, C<time> and C<hash>; the C<error> variable will be present when
+an error occured during title fetching. The C<time> will be the formated string of the
+time including the location. The C<hash> variable will contain a hashref that is the
+output of C<data()> method of L<WWW::Google::Time> module. Order
+for arrayrefs will be the same as the order in C<location> argument.
+
+If C<location> argument was set to a single string, then C<{plug_google_time}> will contain
+the formated time of the location, C<{plug_google_time_error}> will be set if an error
+occured and C<{plug_google_time_hash}> will contain the
+output of C<data()> method of L<WWW::Google::Time> module.
+
+
+=head1 App::ZofCMS::Plugin::HTMLFactory (version 0.0102)
 
 NAME
 
@@ -4376,7 +7061,361 @@ The C<entry_end> will be replaced with the following HTML code:
     </div>
 
 
-=head1 App::ZofCMS::Plugin::ImageGallery (version 0.0201)
+=head1 App::ZofCMS::Plugin::HTMLFactory::PageToBodyId (version 0.0102)
+
+NAME
+
+
+Link: L<App::ZofCMS::Plugin::HTMLFactory::PageToBodyId>
+
+
+
+App::ZofCMS::Plugin::HTMLFactory::PageToBodyId - plugin to automatically create id="" attributes on <body> depending on the current page
+
+SYNOPSIS
+
+In your Main Config file or ZofCMS Template:
+
+    plugins => [ qw/HTMLFactory::PageToBodyId/ ],
+
+    body_id => 'override', # including the key overrides the plugin's value
+
+In your L<HTML::Template> template:
+
+    <tmpl_var escape='html' name='body_id'>
+
+DESCRIPTION
+
+The module is a small plugin for L<App::ZofCMS>. Its purpose is to automatically generate a
+value for an C<id=""> attribute that is to be put on C<< <body> >> HTML element; this value
+would be used to differentiate different pages on the site and is generated from query C<dir>
+and C<page> parameters.
+
+This documentation assumes you've read L<App::ZofCMS>, L<App::ZofCMS::Config>
+and L<App::ZofCMS::Template>
+
+MAIN CONFIG FILE OR ZofCMS TEMPLATE
+
+C<plugins>
+
+    plugins => [ qw/HTMLFactory::PageToBodyId/ ],
+
+You need to add the plugin to the list of plugins to execute. Unlike many other plugins,
+the C<HTMLFactory::PageToBodyId> does not require an additional key in the template and
+will run as long as it is included.
+
+C<body_id>
+
+The plugin first checks whether or not C<body_id> first-level key was set in either
+ZofCMS Template or Main Config File. If it exists, plugin stuffs its value under
+C<< $t->{t}{body_id} >> (where C<$t> is ZofCMS Template hashref)
+otherwise, it creates its own from query's C<dir> and C<page> keys and uses that.
+
+VALID C<id=""> / PLUGIN'S CHARACTER REPLACEMENT
+
+To quote HTML specification:
+
+    ID and NAME tokens must begin with a letter ([A-Za-z])
+    and may be followed by any number of letters,
+    digits ([0-9]), hyphens ("-"), underscores ("_"),
+    colons (":"), and periods (".").
+
+The plugin replaces any character that doesn't match the criteria with an underscore(C<_>).
+Most of the time it will be the slashes (C</>) present in the full page URL.
+
+GENERATED IDs
+
+After doing invalid character replacement (see above) the plugin prefixes the generated value
+with word "C<page>". Considering that any page URL would start with a slash, the resulting
+values would be in the form of C<page_index>, C<page_somedir_about-us> and so on.
+
+HTML::Template VARIABLES
+
+The plugin sets C<body_id> key in C<t> ZofCMS Template special key, thus you can use
+C<< <tmpl_var name='body_id'> >> in any of your L<HTML::Template> templates to obtain the
+generated ID. The name of the key cannot be changed.
+
+SEE ALSO
+
+L<App::ZofCMS>, L<App::ZofCMS::Config>, L<App::ZofCMS::Template>, L<http://www.w3.org/TR/html401/types.html#type-name>
+
+
+=head1 App::ZofCMS::Plugin::HTMLMailer (version 0.0102)
+
+NAME
+
+
+Link: L<App::ZofCMS::Plugin::HTMLMailer>
+
+
+
+App::ZofCMS::Plugin::HTMLMailer - ZofCMS plugin for sending HTML email
+
+SYNOPSIS
+
+    plugins => [
+        { HTMLMailer => 2000, },
+    ],
+
+    plug_htmlmailer => {
+        to          => 'cpan@zoffix.com',
+        template    => 'email-template.tmpl',
+
+        # everything below is optional
+        template_params => [
+            foo => 'bar',
+            baz => 'ber',
+        ],
+        subject         => 'Test Subject',
+        from            => 'Zoffix Znet <any.mail@fake.com>',
+        template_dir    => 'mail-templates',
+        precode         => sub {
+            my ( $t, $q, $config, $plug_conf ) = @_;
+            # run some code
+        },
+        mime_lite_params => [
+            'smtp',
+            'srvmail',
+            Auth   => [ 'FOOBAR/foos', 'p4ss' ],
+        ],
+        html_template_object => HTML::Template->new(
+            filename            => 'mail-templates/email-template.tmpl',
+            die_on_bad_params   => 0,
+        ),
+    },
+
+DESCRIPTION
+
+The module is a ZofCMS plugin that provides means to easily create an 
+email from an L<HTML::Template> template, fill it, and email it as an HTML 
+email.
+
+This documentation assumes you've read
+L<App::ZofCMS>, L<App::ZofCMS::Config> and L<App::ZofCMS::Template>
+
+FIRST-LEVEL ZofCMS TEMPLATE KEYS
+
+C<plugins>
+
+    plugins => [ qw/HTMLMailer/ ],
+
+First and obvious, you need to stick C<HTMLMailer> in the list of your
+plugins.
+
+C<plug_htmlmailer>
+
+    plug_htmlmailer => {
+        to          => 'cpan@zoffix.com',
+        template    => 'email-template.tmpl',
+
+        # everything below is optional
+        template_params => [
+            foo => 'bar',
+            baz => 'ber',
+        ],
+        subject         => 'Test Subject',
+        from            => 'Zoffix Znet <any.mail@fake.com>',
+        template_dir    => 'mail-templates',
+        precode         => sub {
+            my ( $t, $q, $config, $plug_conf ) = @_;
+            # run some code
+        },
+        mime_lite_params => [
+            'smtp',
+            'srvmail',
+            Auth   => [ 'FOOBAR/foos', 'p4ss' ],
+        ],
+        html_template_object => HTML::Template->new(
+            filename            => 'mail-templates/email-template.tmpl',
+            die_on_bad_params   => 0,
+        ),
+    },
+
+B<Mandatory>. Takes either a hashref or a subref as a value. If subref is
+specified, its return value will be assigned to C<plug_htmlmailer> as if
+it was already there. If sub returns an C<undef>, then plugin will stop
+further processing. The C<@_> of the subref will contain (in that order):
+ZofCMS Tempalate hashref, query parameters hashref and 
+L<App::ZofCMS::Config> object. Possible keys/values for the hashref
+are as follows:
+
+C<to>
+
+    plug_htmlmailer => {
+        to => 'foo@bar.com',
+    ...
+
+    plug_htmlmailer => {
+        to => [ 'foo@bar.com', 'ber@bar.com', ],
+    ...
+
+    plug_htmlmailer => {
+        to => sub {
+            my ( $t, $q, $config ) = @_;
+            return [ 'foo@bar.com', 'ber@bar.com', ];
+        }
+    ...
+
+B<Mandatory>. Specifies the email address(es) to which to send the email.
+Takes a scalar, an arrayref or a subref as a value. If a scalar is
+specified, plugin will create a single-item arrayref with it; if an
+arrayref is specified, each of its items will be interpreted as an
+email address to which to send email. If a subref is specified, its return
+value will be assigned to the C<to> key and its C<@_> array will contain:
+C<$t>, C<$q>, C<$config> (in that order) where C<$t> is ZofCMS Template
+hashref, C<$q> is the query parameter hashref and C<$config> is the
+L<App::ZofCMS::Config> object. B<Default:> if the C<to> key is not defined
+(or the subref to which it's set returns undef) then the plugin will stop
+further processing.
+
+C<template>
+
+    plug_htmlmailer => {
+        template => 'email-template.tmpl',
+    ...
+
+B<Mandatory, unless> C<html_template_object> B<(see below) is specified>.
+Takes a scalar as a value that represents the location of the
+L<HTML::Template> template to use as the body of your email. If relative
+path is specified, it will be relative to the location of C<index.pl> file.
+B<Note:> if C<template_dir> is specified, it will be prepended to whatever
+you specify here.
+
+C<template_params>
+
+    plug_htmlmailer => {
+        template_params => [
+            foo => 'bar',
+            baz => 'ber',
+        ],
+    ...
+
+    plug_htmlmailer => {
+        template_params => sub {
+            my ( $t, $q, $config ) = @_:
+            return [ foo => 'bar', ];
+        }
+    ...
+
+B<Optional>. Specifies key/value parameters for L<HTML::Template>'s
+C<param()> method; this will be called on the L<HTML::Template> template
+of your email body (specified by C<template> argument).
+Takes an arrayref or a subref as a value. If subref is
+specified, its C<@_> will contain C<$t>, C<$q>, and C<$config> (in that
+order), where C<$t> is ZofCMS Template hashref, C<$q> is query parameter
+hashref, and C<$config> is L<App::ZofCMS::Config> object. The subref must
+return either an arrayref or an C<undef> (or empty list), and that will be 
+assigned to C<template_params> as a true value. B<By default> is not
+specified.
+
+C<subject>
+
+    plug_htmlmailer => {
+        subject => 'Test Subject',
+    ...
+
+B<Optional>. Takes a scalar as a value that specifies the subject line
+of your email. B<Default:> empty string.
+
+C<from>
+
+    plug_htmlmailer => {
+        from => 'Zoffix Znet <any.mail@fake.com>',
+    ...
+
+B<Optional>. Takes a scalar as a value that specifies the C<From> field
+for your email. If not specified, the plugin will simply not set the
+C<From> argument in L<MIME::Lite>'s C<new()> method (which is what
+this plugin uses under the hood). See L<MIME::Lite>'s docs for more
+description. B<By default> is not specified.
+
+C<template_dir>
+
+    plug_htmlmailer => {
+        template_dir => 'mail-templates',
+    ...
+
+B<Optional>. Takes a scalar as a value. If specified, takes either an
+absolute or relative path to the directory that contains all your
+L<HTML::Template> email templates (see C<template> above for more info). If
+relative path is specified, it will be relative to the C<index.pl> file.
+The purpose of this argument is to simply have a shortcut to save you the
+trouble of specifying the directory every time you use C<template>.
+B<By default> is not specified.
+
+C<precode>
+
+    plug_htmlmailer => {
+        precode => sub {
+            my ( $t, $q, $config, $plug_conf ) = @_;
+            # run some code
+        },
+    ...
+
+B<Optional>. Takes a subref as a value. This is just an "insertion point",
+a place to run a piece of code if you really have to. The C<@_> of the 
+subref will contain C<$t>, C<$q>, C<$config>, and C<$plug_conf> (in that
+order), where C<$t> is ZofCMS Template hashref, C<$q> is query parameters
+hashref, C<$config> is L<App::ZofCMS::Config> object, and C<$plug_conf>
+is the configuration hashref of this plugin (that is the
+C<plug_htmlmailer> hashref). You can use C<$plug_conf> to stick modified
+configuration arguments to the I<current run> of this plugin (modifications
+will not be saved past current run stage). The subref will be executed
+B<after> the C<to> argument is processed, but before anything else is
+done. B<Note:> if C<to> is not set (or set to subref that returns undef)
+then the C<precode> subref will B<NOT> be executed at all. B<By default>
+is not specified.
+
+C<mime_lite_params>
+
+    plug_htmlmailer => {
+        mime_lite_params => [
+            'smtp',
+            'srvmail',
+            Auth   => [ 'FOOBAR/foos', 'p4ss' ],
+        ],
+    ...
+
+B<Optional>. Takes an arrayref as a value. If specified, the arrayref
+will be directly dereferenced into C<< MIME::Lite->send() >>. Here you 
+can set any special send arguments you need; see L<MIME::Lite> docs for
+more info. B<By default> is not specified.
+
+C<html_template_object>
+
+    plug_htmlmailer => {
+        html_template_object => HTML::Template->new(
+            filename            => 'mail-templates/email-template.tmpl',
+            die_on_bad_params   => 0,
+        ),
+    ...
+
+B<Optional>. Takes an L<HTML::Template> object (or something that behaves
+like one). If specified, the C<template> and C<template_dir> arguments
+will be ignored and the object you specify will be used instead. B<Note:>
+the default L<HTML::Template> object (used when C<html_template_object>
+is B<not> specified) has C<die_on_bad_params> argument set to a false
+value; using C<html_template_object> you can change that.
+B<By default> is not specified.
+
+OUTPUT
+
+This plugin doesn't produce any output and doesn't set any keys.
+
+A WARNING ABOUT ERRORS
+
+This plugin doesn't have any error handling. The behaviour is completely
+undefined in cases of: invalid email addresses, improper or
+insufficient C<mime_lite_params> values, no C<from> set, etc. For example,
+on my system, not specifying any C<mime_lite_params> makes it look
+like plugin is not running at all. If things go awry: copy the plugin's
+code into your projects dir
+(C<zofcms_helper --nocore --site YOUR_PROJECT --plugins HTMLMailer>) and
+mess around with code to see what's wrong (the code would be located in
+C<YOUR_PROJECT_site/App/ZofCMS/Plugin/HTMLMailer.pm>)
+
+
+=head1 App::ZofCMS::Plugin::ImageGallery (version 0.0203)
 
 NAME
 
@@ -4471,11 +7510,23 @@ C<plug_image_gallery>
         lightbox_desc   => 1,
     }
 
+    plug_image_gallery => sub {
+        my ( $t, $q, $config ) = @_;
+        return {
+            dsn             => "DBI:mysql:database=test;host=localhost",
+        };
+    }
+
 The plugin takes its configuration from C<plug_image_gallery> first-level key that takes
-a hashref as a value and can be specified in either (or both) Main Config File and
+a hashref or a subref as a value and can be specified in either (or both) Main Config File and
 ZofCMS Template file. If the same key in that hashref is specified in both, Main Config File
 and ZofCMS Tempate file, then the value given to it in ZofCMS Template will take precedence.
-
+If subref is specified,
+its return value will be assigned to C<plug_image_gallery> as if it was already there. If sub returns
+an C<undef>, then plugin will stop further processing. The C<@_> of the subref will
+contain (in that order): ZofCMS Tempalate hashref, query parameters hashref and
+L<App::ZofCMS::Config> object.
+    
 The plugin will B<NOT> run if C<plug_image_gallery> is not set or if B<both> C<no_form>
 B<and> C<no_list> arguments (see below) are set to true values.
 
@@ -4772,7 +7823,785 @@ original image view
     </div>
 
 
-=head1 App::ZofCMS::Plugin::LinksToSpecs::CSS (version 0.0101)
+=head1 App::ZofCMS::Plugin::ImageResize (version 0.0103)
+
+NAME
+
+
+Link: L<App::ZofCMS::Plugin::ImageResize>
+
+
+
+App::ZofCMS::Plugin::ImageResize - Plugin to resize images
+
+SYNOPSIS
+
+
+    plugins => [
+        qw/ImageResize/
+    ],
+
+    plug_image_resize => {
+        images => [
+            qw/3300 3300 frog.png/
+        ],
+        # below are all the default values
+        inplace     => 1,
+        only_down   => 1,
+        cell        => 'd',
+        key         => 'plug_image_resize',
+        path        => 'thumbs',
+    },
+
+DESCRIPTION
+
+The module is a plugin for L<App::ZofCMS> that provides simple image resize capabilities.
+This documentation assumes you've read L<App::ZofCMS>, L<App::ZofCMS::Config> and
+L<App::ZofCMS::Template>.
+
+FIRST-LEVEL ZofCMS TEMPLATE AND MAIN CONFIG FILE KEYS
+
+C<plugins>
+
+    plugins => [
+        qw/ImageResize/
+    ],
+
+B<Mangatory>. You need to add the plugin to list of plugins to execute.
+
+C<plug_image_resize>
+
+    plug_image_resize => {
+        images => [
+            qw/3300 3300 frog.png/
+        ],
+        # optional options below; all are the default values
+        inplace     => 1,
+        only_down   => 1,
+        cell        => 'd',
+        key         => 'plug_image_resize',
+        path        => 'thumbs',
+    },
+
+    plug_image_resize => sub {
+        my ( $t, $q, $config ) = @_;
+        return {
+            images => [
+                qw/3300 3300 frog.png/
+            ],
+        }
+    },
+
+B<Mandatory>. Takes a hashref or a subref as a value. If subref is specified,
+its return value will be assigned to C<plug_image_resize> as if it was already there. If sub returns
+an C<undef>, then plugin will stop further processing. The C<@_> of the subref will
+contain (in that order): ZofCMS Tempalate hashref, query parameters hashref and
+L<App::ZofCMS::Config> object.
+The C<plug_image_resize> first-level key can be set in either (or both)
+ZofCMS Template and Main Config File files. If set in both, the values of keys that are set in
+ZofCMS Template take precedence. Possible keys/values are as follows:
+
+C<images>
+
+        images => [
+            qw/3300 3300 frog.png/
+        ],
+
+        images => {
+            image1 => {
+                x           => 110,
+                y           => 110,
+                image       => 'frog.png',
+                inplace     => 1,
+                only_down   => 1,
+                path        => 'thumbs',
+            },
+            image2 => [ qw/3300 3300 frog.png/ ],
+        },
+
+        images => [
+            [ qw/1000 1000 frog.png/ ],
+            [ qw/110 100 frog.png 0 1/ ],
+            {
+                x           => 110,
+                y           => 110,
+                image       => 'frog.png',
+                inplace     => 1,
+                only_down   => 1,
+                path        => 'thumbs',
+            },
+        ],
+
+        images => sub {
+            my ( $t, $q, $config ) = @_;
+            return [ qw/100 100 frog.png/ ];
+        },
+
+B<Mandatory>. The C<images> key is the only optional key. Its value can be either an
+arrayref, an arrayref of arrayrefs/hashrefs, subref or a hashref.
+
+If the value is a subref, the C<@_> will contain (in the following order): ZofCMS Template
+hashref, query parameters hashref, L<App::ZofCMS::Config> object. The return value
+of the sub will be assigned to C<images> key; if it's C<undef> then plugin will not execute
+further.
+
+When value is a hashref, it tells the plugin to resize several images and keys will represent
+the names of the keys in the result (see OUTPUT section below) and values are the image
+resize options. When value is an
+arrayref of scalar values, it tells the plugin to resize only one image and that resize
+options are in a "shortform" (see below). When the value is an arrayref of arrayrefs/hashrefs
+it means there are several images to resize and each element of the arrayref is an
+image to be resized and its resize options are set by each of those inner arrayrefs/hashrefs.
+
+When resize options are given as an arrayref they correspond to the hashref-form keys
+in the following order:
+
+    x  y  image  inplace  only_down  path
+
+In other words, the following resize options are equivalent:
+
+    [ qw/100 200 frog.png 0 1 thumbs/ ],
+
+    {
+        x           => 110,
+        y           => 110,
+        image       => 'frog.png',
+        inplace     => 1,
+        only_down   => 1,
+        path        => 'thumbs',
+    },
+
+The C<x>, C<y> and C<image> keys are mandatory. The rest of the keys are optional and their
+defaults are whatever is set to the same-named keys in the plugin's configuration (see below).
+The C<x> and C<y> keys specify the dimensions to which the image should be resized
+(see also the C<only_down> option described below). The C<image> key contans the path to
+the image, relative to C<index.pl> file.
+
+C<inplace>
+
+    inplace => 1,
+
+B<Optional>. Takes either true or false values. When set to a true value, the plugin
+will resize the images inplace (i.e. the resized version will be written over the original).
+When set to a false value, the plugin will first copy the image into directory specified by
+C<path> key and then resize it. B<Defaults to:> C<1>
+
+C<only_down>
+
+    only_down => 1,
+
+B<Optional>. Takes either true or false values. When set to a true value, the plugin will
+only resize images if either of their dimensions is larger than what is set in C<x> or C<y>
+parameters. When set to a false value, the plugin will scale small images up to meet
+the C<x>/C<y> criteria. B<Note:> the plugin will always keep aspect ratio of the images.
+B<Defaults to:> C<1>
+
+C<cell>
+
+    cell => 'd',
+
+B<Optional>. Specifies the name of the first-level key of ZofCMS Template hashref into
+which to put the results. Must point to either a non-existant key or a hashref.
+B<Defaults to:> C<d>
+
+C<key>
+
+    key => 'plug_image_resize',
+
+B<Optional>. Specifies the name of the second-level key (i.e. the name of the key inside
+C<cell> hashref) where to put the results. B<Defaults to:> C<plug_image_resize>
+
+C<path>
+
+    path => 'thumbs',
+
+B<Optional>. Specifies the name of the directory, relative to C<index.pl>, into which to
+copy the resized images when C<inline> resize option is set to a false value. B<Defaults to:>
+C<thumbs>.
+
+ERRORS ON RESIZE
+
+If an error occured during a resize, instead of a hashref you'll have an C<undef> and the
+reason for error will be set to C<< $t->{t}{plug_image_resize_error} >> where C<$t> is the
+ZofCMS Template hashref.
+
+OUTPUT
+
+The plugin will place the output into C<key> hashref key inside C<cell> first-level key
+(see parameters above). The type of value of the C<key> will depend on how the C<images>
+parameter was set (see dumps below for examples). In either case, each of the resized
+images will result in a hashref inside the results. The C<x> and C<y> keys will contain
+image's new size. The C<image> key will contain the path to the image relative to C<index.pl>
+file. If the image was not resized then the C<no_resize> key will be present and its value
+will be C<1>. The C<inplace>, C<path> and C<only_down> keys will be set to the values
+that were set to be used in resize options.
+
+    # `images` is set to a hashref with a key named `image1`
+    'd' => {
+        'plug_image_resize' => {
+            'image1' => {
+                'inplace' => '0',
+                'y' => 2062,
+                'path' => 'thumbs',
+                'only_down' => '0',
+                'x' => 3300,
+                'image' => 'thumbs/frog.png'
+        }
+    }
+
+    # `images` is set to one arrayref (i.e. no inner arrayrefs)
+    'd' => {
+        'plug_image_resize' => {
+            'inplace' => '0',
+            'y' => 2062,
+            'path' => 'thumbs',
+            'only_down' => '0',
+            'x' => 3300,
+            'image' => 'thumbs/frog.png'
+        }
+    },
+
+    # `images` is set to one arrayref of arrayrefs
+    'd' => {
+        'plug_image_resize' => [
+            {
+                'inplace' => '0',
+                'y' => 2062,
+                'path' => 'thumbs',
+                'only_down' => '0',
+                'x' => 3300,
+                'image' => 'thumbs/frog.png'
+            }
+        ],
+    },
+
+
+=head1 App::ZofCMS::Plugin::InstalledModuleChecker (version 0.0102)
+
+NAME
+
+
+Link: L<App::ZofCMS::Plugin::InstalledModuleChecker>
+
+
+
+App::ZofCMS::Plugin::InstalledModuleChecker - utility plugin to check for installed modules on the server
+
+SYNOPSIS
+
+In ZofCMS Template or Main Config File:
+
+    plugins => [
+        qw/InstalledModuleChecker/,
+    ],
+
+    plug_installed_module_checker => [
+        qw/ Image::Resize
+            Foo::Bar::Baz
+            Carp
+        /,
+    ],
+
+In HTML::Template template:
+
+    <ul>
+        <tmpl_loop name='plug_installed_module_checker'>
+        <li>
+            <tmpl_var escape='html' name='info'>
+        </li>
+        </tmpl_loop>
+    </ul>
+
+DESCRIPTION
+
+The module is a utility plugin for L<App::ZofCMS> that provides means to check for whether
+or not a particular module is installed on the server and get module's version if it is
+installed.
+
+The idea for this plugin came to me when I was constantly writing "little testing scripts"
+that would tell me whether or not a particular module was installed on the crappy
+server that I have to work with all the time.
+
+This documentation assumes you've read L<App::ZofCMS>, L<App::ZofCMS::Config> and
+L<App::ZofCMS::Template>
+
+FIRST-LEVEL ZofCMS TEMPLATE AND MAIN CONFIG FILE KEYS
+
+C<plugins>
+
+    plugins => [
+        qw/InstalledModuleChecker/,
+    ],
+
+B<Mandatory>. You need to include the plugin in the list of plugins to execute.
+
+C<plug_installed_module_checker>
+
+    plug_installed_module_checker => [
+        qw/ Image::Resize
+            Foo::Bar::Baz
+            Carp
+        /,
+    ],
+
+B<Mandatory>. Takes an arrayref as a value.
+Can be specified in either ZofCMS Template or Main Config File; if set in
+both, the value in ZofCMS Template takes precedence. Each element of the arrayref
+must be a module name that you wish to check for "installedness".
+
+OUTPUT
+
+    <ul>
+        <tmpl_loop name='plug_installed_module_checker'>
+        <li>
+            <tmpl_var escape='html' name='info'>
+        </li>
+        </tmpl_loop>
+    </ul>
+
+Plugin will set C<< $t->{t}{plug_installed_module_checker} >> (where C<$t> is ZofCMS Template
+hashref) to an arrayref of hashrefs; thus, you'd use a C<< <tmpl_loop> >> to view the info.
+Each hashref will have only one key - C<info> - with information about whether or
+not a particular module is installed.
+
+
+=head1 App::ZofCMS::Plugin::JavaScriptMinifier (version 0.0102)
+
+NAME
+
+
+Link: L<App::ZofCMS::Plugin::JavaScriptMinifier>
+
+
+
+App::ZofCMS::Plugin::JavaScriptMinifier - plugin for minifying JavaScript files
+
+SYNOPSIS
+
+In your ZofCMS Template or Main Config File:
+
+    plugins => [
+        qw/JavaScriptMinifier/,
+    ],
+
+    plug_js_minifier => {
+        file => 'main.js',
+    },
+
+Now, this page can be linked into your document as a JavaScript file (it 
+will be minified)
+
+DESCRIPTION
+
+The module is a plugin for L<App::ZofCMS> that provides means to send minified JavaScript files.
+
+This documentation assumes you've read L<App::ZofCMS>, L<App::ZofCMS::Config> and L<App::ZofCMS::Template>
+
+WTF IS MINIFIED?
+
+Minified means that all the useless stuff (which means whitespace, etc)
+will be stripped off the JavaScript file to save a few bytes. See L<JavaScript::Minifier> for more info.
+
+FIRST-LEVEL ZofCMS TEMPLATE AND MAIN CONFIG FILE KEYS
+
+C<plugins>
+
+    plugins => [
+        qw/JavaScriptMinifier/,
+    ],
+
+B<Mandatory>. You need to include the plugin to the list of plugins to execute.
+
+C<plug_js_minifier>
+
+    plug_js_minifier => {
+        file        => 'main.js',
+        auto_output => 1, # default value
+        cache       => 1, # default value
+    },
+
+    plug_js_minifier => sub {
+        my ( $t, $q, $config ) = @_;
+        return {
+            file        => 'main.js',
+            auto_output => 1,
+            cache       => 1,
+        };
+    },
+
+B<Mandatory>. Takes a hashref or a subref as a value. If subref is specified,
+its return value will be assigned to C<plug_js_minifier> as if it was already there. If sub returns
+an C<undef>, then plugin will stop further processing. The C<@_> of the subref will
+contain (in that order): ZofCMS Tempalate hashref, query parameters hashref and
+L<App::ZofCMS::Config> object. Individual keys can be set in both Main Config
+File and ZofCMS Template, if the same key set in both, the value in ZofCMS Template will
+take precedence. The following keys/values are accepted:
+
+C<file>
+
+    plug_js_minifier => {
+        file        => 'main.js',
+    }
+
+B<Mandatory>. Takes a string as an argument that specifies the name of the 
+JavaScript file to minify. The filename is relative to C<index.pl> file.
+
+C<cache>
+
+    plug_js_minifier => {
+        file        => 'main.js',
+        cache       => 1,
+    },
+
+B<Optional>. Takes either true or false values. When set to a true value the plugin will
+send out an HTTP C<Expires> header that will say that this content expries in like 2038, thus
+B<set this option to a false value while still developing your JavaScript>. This argument
+has no effect when C<auto_output> (see below) is turned off (set to a false value).
+B<Defaults to:> C<1>
+
+C<auto_output>
+
+    plug_js_minifier => {
+        file        => 'main.js',
+        auto_output => 1,
+    },
+
+B<Optional>. Takes either true or false values. When set to a true value, plugin will
+automatically send C<text/javascript> C<Content-type> header (along with C<Expires> header if
+C<cache> argument is set to a true value), output the minified JavaScript file B<and exit()>.
+Otherwise, the minified JavaScript file will be put into C<< $t->{t}{plug_js_minifier} >>
+where C<$t> is ZofCMS Template hashref and you can do whatever you want with it.
+B<Defaults to:> C<1>
+
+
+=head1 App::ZofCMS::Plugin::LinkifyText (version 0.0110)
+
+NAME
+
+
+Link: L<App::ZofCMS::Plugin::LinkifyText>
+
+
+
+App::ZofCMS::Plugin::LinkifyText - plugin to convert links in plain text into proper HTML <a> elements
+
+SYNOPSIS
+
+In ZofCMS Template or Main Config File:
+
+    plugins => [
+        qw/LinkifyText/,
+    ],
+
+    plug_linkify_text => {
+        text => qq|http://zoffix.com foo\nbar\nhaslayout.net|,
+        encode_entities => 1, # this one and all below are optional; default values are shown
+        new_lines_as_br => 1,
+        cell => 't',
+        key  => 'plug_linkify_text',
+        callback => sub {
+            my $uri = encode_entities $_[0];
+            return qq|<a href="$uri">$uri</a>|;
+        },
+    },
+
+In HTML::Template template:
+
+    <tmpl_var name='plug_linkify_text'>
+
+DESCRIPTION
+
+The module is a plugin for L<App::ZofCMS> that provides means convert
+URIs found in plain text into proper <a href=""> HTML elements.
+
+This documentation assumes you've read L<App::ZofCMS>, 
+L<App::ZofCMS::Config> and L<App::ZofCMS::Template>
+
+FIRST-LEVEL ZofCMS TEMPLATE AND MAIN CONFIG FILE KEYS
+
+C<plugins>
+
+    plugins => [
+        qw/LinkifyText/,
+    ],
+
+B<Mandatory>. You need to include the plugin to the list of plugins to execute.
+
+C<plug_linkify_text>
+
+    plug_linkify_text => {
+        text => qq|http://zoffix.com foo\nbar\nhaslayout.net|,
+        encode_entities => 1,
+        new_lines_as_br => 1,
+        cell => 't',
+        key  => 'plug_linkify_text',
+        callback => sub {
+            my $uri = encode_entities $_[0];
+            return qq|<a href="$uri">$uri</a>|;
+        },
+    },
+
+    plug_linkify_text => {
+        text => qq|http://zoffix.com foo\nbar\nhaslayout.net|,
+        encode_entities => 1,
+        new_lines_as_br => 1,
+        cell => 't',
+        key  => 'plug_linkify_text',
+        callback => sub {
+            my $uri = encode_entities $_[0];
+            return qq|<a href="$uri">$uri</a>|;
+        },
+    },
+
+    plug_linkify_text => sub {
+        my ( $t, $q, $config ) = @_;
+        return {
+            text => qq|http://zoffix.com foo\nbar\nhaslayout.net|,
+        }
+    }
+
+B<Mandatory>. Takes a hashref or a subref as a value; individual keys can be set in
+both Main Config
+File and ZofCMS Template, if the same key set in both, the value in ZofCMS 
+Template will
+take precedence. If subref is specified,
+its return value will be assigned to C<plug_linkify_text> as if it was already there. If sub returns
+an C<undef>, then plugin will stop further processing. The C<@_> of the subref will
+contain (in that order): ZofCMS Tempalate hashref, query parameters hashref and
+L<App::ZofCMS::Config> object.
+The following keys/values are accepted:
+
+C<text>
+
+    plug_linkify_text => {
+        text => qq|http://zoffix.com foo\nbar\nhaslayout.net|,
+    }
+
+    plug_linkify_text => {
+        text => [
+            qq|http://zoffix.com|,
+            qq|foo\nbar\nhaslayout.net|,
+        ]
+    }
+
+    plug_linkify_text => {
+        text => sub {
+            my ( $t, $q, $config ) = @_;
+            return $q->{text_to_linkify};
+        },
+    }
+
+    plug_linkify_text => {
+        text  => \[ qw/replies  reply_text/ ],
+        text2 => 'post_text',
+        text3 => [ qw/comments  comment_text  comment_link_text/ ],
+    }
+
+B<Pseudo-Mandatory>; if not specified (or C<undef>) plugin will not run.
+Takes a wide range of values:
+
+subref
+
+    plug_linkify_text => {
+        text => sub {
+            my ( $t, $q, $config ) = @_;
+            return $q->{text_to_linkify};
+        },
+    }
+
+If set to a subref, the sub's C<@_> will contain C<$t>, C<$q>,
+and C<$config> (in that order), where C<$t> is ZofCMS Template hashref,
+C<$q> is query parameter hashref, and C<$config> is L<App::ZofCMS::Config>
+object. The return value from the sub can be any valid value accepted
+by the C<text> argument (except the subref) and the plugin will proceed
+as if the returned value was assigned to C<text> in the first place
+(including the C<undef>, upon which the plugin will stop executing).
+
+scalar
+
+    plug_linkify_text => {
+        text => qq|http://zoffix.com foo\nbar\nhaslayout.net|,
+    }
+
+If set to a scalar, the plugin will interpret the scalar as the string
+that needs to be linkified (i.e. links in the text changed to HTML links).
+Processed string will be stored into C<key> key under C<cell> first-level
+key (see the description for these below).
+
+arraref
+
+    plug_linkify_text => {
+        text => [
+            qq|http://zoffix.com|,
+            qq|http://zoffix.com|,
+        ]
+    }
+
+    # output:
+    $VAR1 = {
+        't' => 'plug_linkify_text' => [
+            { text => '<a href="http://zoffix.com/">http://zoffix.com/</a>' },
+            { text => '<a href="http://zoffix.com/">http://zoffix.com/</a>' },
+    };
+
+If set to an arrayref, each element of that arrayref will be taken
+as a string that needs to be linkified. The output will be stored 
+into C<key> key under C<cell> first-level key, and that output will be
+an arrayref of hashrefs. Each hashref will have only one key - C<text> -
+value of which is the converted text (thus you can use this arrayref
+directly in C<< <tmpl_loop> >>)
+
+a ref of a ref
+
+    plug_linkify_text => {
+        text  => \[ qw/replies  reply_text/ ],
+        text2 => 'post_text',
+        text3 => [ qw/comments  comment_text  comment_link_text/ ],
+    }
+
+Lastly, C<text> can be set to a... ref of a ref (bare with me). I think
+it's easier to understand the functionality when it's viewed as a
+following sequential process:
+
+When C<text> is set to a ref of a ref, the plugin enables the I<inplace>
+edit mode. This is as far as this goes, and plugin dereferences this
+ref of a ref into an arrayref or a scalarref. Along with a simple scalar,
+these entities can be assigned to any I<extra> C<text> keys (see below).
+What I<inplace> edit mode means is that C<text> no longer contains direct
+strings of text to linkify, but rather an address of where to find,
+and edit, those strings.
+
+When I<inplace> mode is turned on, you can tell plugin to linkify
+multiple places. In order to specify another address for a string to edit,
+simply add another C<text> postfixed with a number (e.g. C<text4>; what
+the actual number is does not matter, the key just needs to match 
+C<qr/^text\d+$/>). The values of all the B<extra> C<text> keys do not have
+to be refs of refs, but rather can be either scalars, scalarrefs
+or arrayrefs.
+
+A scalar and scalarref have same meaning here, i.e. the scalarref will
+be automatically dereferenced into a scalar. A simple scalar tells the
+plugin that the value of this scalar is the name of a key inside 
+C<{t}> ZofCMS Template special key, value of which contains the text to
+be linkified. The plugin will directly modify (linkify) that text. This
+can be used, for example, when you use L<App::ZofCMS::Plugin::DBI> plugin's
+"single" retrieval mode.
+
+The arrayrefs have different meaning. Their purpose is to process
+B<arrayrefs of hashrefs> (this will probably conjure up 
+L<App::ZofCMS::Plugin::DBI> plugin's output in your mind). The first
+item in the arrayref represents the name of the key inside the
+C<{t}> ZofCMS Template special key's hashref; the value of that key is
+the arrayref of hashrefs. All the following (one or more) items in the
+arrayref represent hashref keys that point to data to linkify.
+
+Let's take a look at actual code examples. Let's imagine your C<{t}>
+special key contains the following arrayref, say, put there by DBI plugin;
+this arrayref is referenced by a C<dbi_output> key here. Also in the
+example, the C<dbi_output_single> is set to a scalar, a string of text that
+we want to linkify:
+
+    dbi_output => [
+        { ex => 'foo', ex2 => 'bar' },
+        { ex => 'ber', ex2 => 'beer' },
+        { ex => 'baz', ex2 => 'craz' },
+    ],
+    dbi_output_single => 'some random text',
+
+If you want to linkify all the texts inside C<dbi_output>
+to which the C<ex> keys point, you'd set C<text> value as
+C<< text => \[ qw/dbi_output  ex/ ] >>. If you want to linkify the C<ex2>
+data as well, then you'd set C<text> as
+C<< text => \[ qw/dbi_output  ex  ex2/ ] >>. Can you guess what the code
+to linkify I<all> the text in the example above will be? Here it is:
+
+    # note that we are assigning a REF of an arrayref to the first `text`
+    plug_linkify_text => {
+        text    => \[
+            'dbi_output',  # the key inside {t}
+            'ex', 'ex2'    # keys of individual hashrefs that point to data
+        ],
+        text2   => 'dbi_output_single', # note that we didn't have to make this a ref
+    }
+    
+    # here's an alternative version that does the same thing:
+    plug_linkify_text => {
+        text    => \\'dbi_output_single', # note that this is a ref of a ref
+        text554 => [  # this now doesn't have to be a ref of a ref
+            'dbi_output',  # the key inside {t}
+            'ex', 'ex2'    # keys of individual hashrefs that point to data
+        ],
+    }
+
+C<encode_entities>
+
+    plug_linkify_text => {
+        text => qq|http://zoffix.com foo\nbar\nhaslayout.net|,
+        encode_entities => 1,
+    }
+
+B<Optional>. Takes either true or false values. When set to a true
+value, plugin will encode HTML entities in the provided text before
+processing URIs. B<Defaults to:> C<1>
+
+C<new_lines_as_br>
+
+    plug_linkify_text => {
+        text => qq|http://zoffix.com foo\nbar\nhaslayout.net|,
+        new_lines_as_br => 1,
+    }
+
+B<Optional>. Applies only when C<encode_entities> (see above) is set
+to a true value. Takes either true or false values. When set to
+a true value, the plugin will convert anything that matches C</\r?\n/>
+into HTML <br> element. B<Defaults to:> C<1>
+
+C<cell>
+
+    plug_linkify_text => {
+        text => qq|http://zoffix.com foo\nbar\nhaslayout.net|,
+        cell => 't',
+    }
+
+B<Optional>. Takes a literal string as a value. Specifies the name
+of the B<first-level> key in ZofCMS Template hashref into which to put
+the result; this key must point to either an undef value or a hashref.
+See C<key> argument below as well.
+B<Defaults to:> C<t>
+
+C<key>
+
+    plug_linkify_text => {
+        text => qq|http://zoffix.com foo\nbar\nhaslayout.net|,
+        key  => 'plug_linkify_text',
+    }
+
+B<Optional>. Takes a literal string as a value. Specifies the name
+of the B<second-level> key that is inside C<cell> (see above) key - 
+plugin's output will be stored into this key.
+B<Defaults to:> C<plug_linkify_text>
+
+C<callback>
+
+    plug_linkify_text => {
+        text => qq|http://zoffix.com foo\nbar\nhaslayout.net|,
+        callback => sub {
+            my $uri = encode_entities $_[0];
+            return qq|<a href="$uri">$uri</a>|;
+        },
+    },
+
+B<Optional>. Takes a subref as a value. This subref will be used
+as the "callback" sub in L<URI::Find::Schemeless>'s C<find()> method.
+See L<URI::Find::Schemeless> for details. B<Defaults to:>
+
+    sub {
+        my $uri = encode_entities $_[0];
+        return qq|<a href="$uri">$uri</a>|;
+    },
+
+
+=head1 App::ZofCMS::Plugin::LinksToSpecs::CSS (version 0.0104)
 
 NAME
 
@@ -4832,6 +8661,10 @@ everything needs to be lowercased:
 
     <tmpl_var name="css_PROP_cp">
     <a href="LINK" title="CSS Specification: 'PROP' property">PROP property</a>
+
+The plugin also has links for C<:after>, C<:hover>, etc. pseudo-classes and pseudo-elements;
+in this case, the rules are the same except in the output word "property" would say
+"pseudo-class" or "pseudo-element".
 
 SEE ALSO
 
@@ -5056,6 +8889,646 @@ the generated HTML code, simply stick C<< <tmpl_var name="nav_maker"> >>
 whereever you wish to have your navigation.
 
 
+=head1 App::ZofCMS::Plugin::PreferentialOrder (version 0.0102)
+
+NAME
+
+
+Link: L<App::ZofCMS::Plugin::PreferentialOrder>
+
+
+
+App::ZofCMS::Plugin::PreferentialOrder - Display HTML snippets in user-controllable, savable order
+
+EXTRA RESOURCES (BEYOND PERL)
+
+This plugin was designed to be used in conjunction with JavaScript (JS)
+code that controls the order of items on the page and submits that
+information to the server.
+
+If you wish to use a different, your own front-end, please study JS code
+provided at the end of this documentation to understand what is required.
+
+SYNOPSIS
+
+In your L<HTML::Template> template:
+
+    <tmpl_var name='plug_pref_order_form'>
+    <tmpl_var name='plug_pref_order_list'>
+    <tmpl_var name='plug_pref_order_disabled_list'>
+
+In your ZofCMS template:
+
+    plugins => [ qw/PreferentialOrder/, ],
+
+    # except for the mandatory argument `items`, the default values are shown
+    plug_preferential_order => {
+        items => [ # four value type variations shown here
+            forum3  => '<a href="#">Forum3</a>',
+            forum4  => [ 'Last forum ":)"',   \'forum-template.tmpl', ],
+            forum   => [ 'First forum ":)"',  '<a href="#">Forum</a>',  ],
+            forum2  => [
+                'Second forum ":)"',
+                sub {
+                    my ( $t, $q, $config ) = @_;
+                    return '$value_for_the_second_element_in_the_arrayref';
+                },
+            ],
+        ],
+        dsn            => "DBI:mysql:database=test;host=localhost",
+        user           => '',
+        pass           => undef,
+        opt            => { RaiseError => 1, AutoCommit => 1 },
+        users_table    => 'users',
+        order_col      => 'plug_pref_order',
+        login_col      => 'login',
+        order_login    => sub { $_[0]->{d}{user}{login} },
+        separator      => ',',
+        has_disabled   => 1,
+        enabled_label  => q|<p class="ppof_label">Enabled items</p>|,
+        disabled_label => q|<p class="ppof_label">Disabled items</p>|,
+        submit_button  => q|<input type="submit" class="input_submit"|
+                            . q| value="Save">|,
+    },
+
+DESCRIPTION
+
+The module is a plugin for L<App::ZofCMS> that provides means to have a 
+sortable list of custom HTML snippets. The order can be defined by each
+individual user to suit their needs. The order is defined using a form
+provided by the plugin, the actual sorting is done by 
+I<MooTools> (L<http://mootools.net>) JS framework. Use of this framework
+is not a necessity; it's up to you what you'll use as a front-end. An
+example of MooTools front-end is provided at the end of this documentation.
+
+The plugin provides two modes: single sortable list, and double lists,
+where the second list represents "disabled" items, although that can
+well be used for having two lists with items being sorted between each of
+them (e.g. primary and secondary navigations).
+
+This documentation assumes you've read L<App::ZofCMS>,
+L<App::ZofCMS::Config> and L<App::ZofCMS::Template>
+
+FIRST-LEVEL ZofCMS TEMPLATE AND MAIN CONFIG FILE KEYS
+
+C<plugins>
+
+    plugins => [ qw/PreferentialOrder/ ],
+
+B<Mandatory>. You need to include the plugin in the list of plugins to 
+execute.
+
+C<plug_preferential_order>
+
+    # except for the mandatory argument `items`, the default values are shown
+    plug_preferential_order => {
+        items => [ # four value type variations shown here
+            forum3  => '<a href="#">Forum3</a>',
+            forum4  => [ 'Last forum ":)"',   \'forum-template.tmpl', ],
+            forum   => [ 'First forum ":)"',  '<a href="#">Forum</a>',  ],
+            forum2  => [
+                'Second forum ":)"',
+                sub {
+                    my ( $t, $q, $config ) = @_;
+                    return '$value_for_the_second_element_in_the_arrayref';
+                },
+            ],
+        ],
+        dsn            => "DBI:mysql:database=test;host=localhost",
+        user           => '',
+        pass           => undef,
+        opt            => { RaiseError => 1, AutoCommit => 1 },
+        users_table    => 'users',
+        order_col      => 'plug_pref_order',
+        login_col      => 'login',
+        order_login    => sub { $_[0]->{d}{user}{login} },
+        separator      => ',',
+        has_disabled   => 1,
+        enabled_label  => q|<p class="ppof_label">Enabled items</p>|,
+        disabled_label => q|<p class="ppof_label">Disabled items</p>|,
+        submit_button  => q|<input type="submit" class="input_submit"|
+                            . q| value="Save">|,
+    },
+
+    # or
+    plug_preferential_order => sub {
+        my ( $t, $q, $config ) = @_;
+        return $hashref_to_assign_to_the_plug_key;
+    },
+
+B<Mandatory>. Takes either an C<undef>, a hashref or a subref as a value.
+If subref is
+specified, its return value will be assigned to C<plug_preferential_order>
+as if it was already there. If C<undef> is specified or the sub returns
+one, then plugin will
+stop further processing. The C<@_> of the subref will contain C<$t>,
+C<$q>, and C<$config> (in that
+order), where C<$t> is ZofCMS Tempalate hashref, C<$q> is query parameter
+hashref and C<$config> is L<App::ZofCMS::Config> object. Possible
+keys/values for the hashref are as follows:
+
+C<items>
+
+    plug_preferential_order => {
+        items => [ # four value type variations shown here
+            forum3  => '<a href="#">Forum3</a>',
+            forum4  => [ 'Last forum ":)"',   \'forum-template.tmpl', ],
+            forum   => [ 'First forum ":)"',  '<a href="#">Forum</a>',  ],
+            forum2  => [
+                'Second forum ":)"',
+                sub {
+                    my ( $t, $q, $config ) = @_;
+                    return '$value_for_the_second_element_in_the_arrayref';
+                },
+            ],
+        ],
+    ...
+
+    plug_preferential_order => {
+        items => sub {
+            my ( $t, $q, $config ) = @_;
+            return $items_arrayref;
+        },
+    ...
+
+B<Mandatory>. Takes an arrayref, a subref or C<undef> as a value. If set to
+C<undef> (i.e. not specified), plugin will not execute. If a subref is
+specified, its return value will be assigned to C<items> as if it was
+already there. The C<@_> of the subref will contain C<$t>,
+C<$q>, and C<$config> (in that order), where C<$t> is ZofCMS Tempalate
+hashref, C<$q> is query parameter hashref and C<$config> is
+L<App::ZofCMS::Config> object. This argument tells the plugin the items on
+the list you want the user to sort and use.
+
+The insides of the arrayref are best to be thought as keys/values of a
+hashref; the reason for the arrayref is to preserve the original order. The
+"keys" of the arrayref must B<NOT> contain C<separator> (see below) and
+need to conform to HTML/Your-markup-language C<id> attribute
+(L<http://xrl.us/bicips>). These keys are used by the plugin
+to label the items in the form that the user uses to sort their lists, the
+labels for the actual list items when they are displayed, as
+well as labels stored in the SQL table for each user.
+
+The "value" of the "key" in the arrayref can be a scalar, a scalarref,
+a subref, as well as an arrayref with two items, first being a scalar and
+the second one being either a scalar, a scalarref, or a subref.
+
+When the value is a scalar, scalarref or subref, it will be internally
+converted to an arrayref with the value being the second item, and the first
+item being the "key" of this "value" in the arrayref. In other words, these
+two codes are equivalent:
+
+    items => [ foo => 'bar', ],
+
+    items => [ foo => [ 'foo', 'bar', ], ],
+
+The first item in the inner arrayref specifies the human readable name of
+the HTML snippet. This will be presented to the user in the sorting form.
+The second item represents the actual snippet and it can be specified
+using one of the following three ways:
+
+a subref
+
+    items => [
+        foo => [
+            bar => sub {
+                my ( $t, $q, $config ) = @_;
+                return 'scalar or scalarref to represent the actual snippet';
+            },
+        ],
+    ],
+
+If the second item is a subref, its C<@_> will contain C<$t>, C<$q>, and
+C<$config> (in that order) where C<$t> is ZofCMS Template hashref,
+C<$q> is query parameter hashref, and C<$config> is L<App::ZofCMS::Config>
+object. The sub must return either a scalar or a scalarref that will be
+assigned to the "key" instead of this subref.
+
+a scalar
+
+    items => [
+        foo => [
+            bar => [ bez => '<a href="#"><tmpl_var name="meow"></a>', ],
+        ],
+    ],
+
+If the second item is a scalar, it will be interpreted as a snippet of
+L<HTML::Template> template. The parameters will be set into this snippet
+from C<{t}> ZofCMS Template special key.
+
+a scalarref
+
+    items => [
+        foo => [
+            bar => [ bez => \'template.tmpl', ],
+        ],
+    ],
+
+If the second item is a scalaref, its meaning and function is the same as
+for the scalar value, except the L<HTML::Template> template snippet will be
+read from the filename specified by the scalarref. Relative paths here
+will be relative to C<index.pl> file.
+
+C<dsn>
+
+    plug_preferential_order => {
+        dsn => "DBI:mysql:database=test;host=localhost",
+    ...
+
+B<Optional, but with useless default value>. The dsn key will be passed to 
+L<DBI>'s C<connect_cached()> method, see documentation for L<DBI> and
+C<DBD::your_database> for the correct syntax for this one. The example
+above uses MySQL database called C<test> that is located on C<localhost>.
+B<Defaults to:> C<DBI:mysql:database=test;host=localhost>
+
+C<user>
+
+    plug_preferential_order => {
+        user => '',
+    ...
+
+B<Optional>. Specifies the user name (login) for the database. This can be
+an empty string if, for example, you are connecting using SQLite driver.
+B<Defaults to:> empty string
+
+C<pass>
+
+    plug_preferential_order => {
+        pass => undef,
+    ...
+
+B<Optional>. Same as C<user> except specifies the password for the
+database. B<Defaults to:> C<undef> (no password)
+
+C<opt>
+
+    plug_preferential_order => {
+        opt => { RaiseError => 1, AutoCommit => 1 },
+    ...
+
+B<Optional>. Will be passed directly to L<DBI>'s C<connect_cached()>
+method as "options". B<Defaults to:>
+C<< { RaiseError => 1, AutoCommit => 1 } >>
+
+C<users_table>
+
+    plug_preferential_order => {
+        users_table => 'users',
+    ...
+    
+    # This is the minimal SQL table needed by the plugin:
+    CREATE TABLE `users` (
+        `login`           TEXT,
+        `plug_pref_order` TEXT
+    );
+
+B<Optional>. Takes a scalar as a value that represents the table into which 
+to store users' sort orders. The table can be anything you want, but must
+at least contain two columns (see C<order_col> and C<login_col> below).
+B<Defaults to:> C<users>
+
+C<order_col>
+
+    plug_preferential_order => {
+        order_col => 'plug_pref_order',
+    ...
+
+B<Optional>. Takes a scalar as a value. Specifies the name of the column in 
+the C<users_table> table into which to store users' sort orders. The
+orders will be stored as strings, so the column must have appropriate type.
+B<Defaults to:> C<plug_pref_order>
+
+C<login_col>
+
+    plug_preferential_order => {
+        login_col => 'login',
+    ...
+
+B<Optional>. Takes a scalar as a value. Specifies the name of the column 
+in the C<users_table> table in which users' logins are stored. The
+plugin will use the values in this column only to look up appropriate 
+C<order_col> columns, thus the data type can be anything you want.
+B<Defaults to:> C<login>
+
+C<order_login>
+
+    plug_preferential_order => {
+        order_login => sub {
+            my ( $t, $q, $config ) = @_;
+            return $t->{d}{user}{login};
+        },
+    ...
+
+    plug_preferential_order => {
+        order_login => 'zoffix',
+    ...
+
+B<Optional>. Takes a scalar, C<undef>, or a subref as a value. If
+set to C<undef> (not specified) the plugin will not run.
+If subref is specified, its return value will be assigned to 
+C<order_login> as it was already there. The C<@_> will contain C<$t>, 
+C<$q>, and C<$config> (in that order) where C<$t> is ZofCMS Template
+hashref, C<$q> is query parameter hashref, and C<$config> is
+L<App::ZofCMS::Config> object. The scalar value specifies the
+"login" of the current user; this will be used to get and
+store the C<order_col> value based on the C<order_login> present in the
+C<login_col> column in the C<users_table> table.
+B<Defaults to:> C<< sub { $_[0]->{d}{user}{login} } >>
+
+C<separator>
+
+    plug_preferential_order => {
+        separator => ',',
+    ...
+
+B<Optional>. Specifies the separator that will be used to join together
+sort order before sticking it into the database. B<IMPORTANT:> your JS
+code must use the same separator to join together the sort order items
+when user submits the sorting form. B<Defaults to:> C<,> (a comma)
+
+C<has_disabled>
+
+    plug_preferential_order => {
+        has_disabled => 1,
+    ...
+
+B<Optional>. Takes either true or false values as a value. When set to a 
+true value, the plugin will present the user with two lists, with the
+items movable between the two. When set to a false value, the plugin
+will show the user only one sortable list.
+
+If the order was stored between the I<two> lists, but then the second list
+becomes disabled, the previously disabled items will be appended to the end 
+of the first list (both in the display list, and in the sorting form). If
+the second list becomes enabled B<before the user saves the single-list
+order>, the divisions between the two lists will be preserved.
+
+Originally, this was designed to have "enabled" and "disabled" groups of
+items, hence the naming of this and few other options; the "enabled" 
+represents the list that is always shown, and the "disabled" represents
+the list that is toggleable with C<has_disabled> argument. B<Defaults to:>
+C<1> (second list is enabled)
+
+C<enabled_label>
+
+    plug_preferential_order => {
+        enabled_label => q|<p class="ppof_label">Enabled items</p>|,
+    ...
+
+B<Optional>. Applies only when C<has_disabled> is set to a true value. 
+Takes HTML code as a value that will be shown above the "enabled" list
+of items inside the sorting form.
+B<Defaults to:> C<< <p class="ppof_label">Enabled items</p> >>
+
+C<disabled_label>
+
+    plug_preferential_order => {
+        disabled_label => q|<p class="ppof_label">Disabled items</p>|,
+    ...
+
+B<Optional>. Applies only when C<has_disabled> is set to a true value. 
+Takes HTML code as a value that will be shown above the "disabled" list
+of items inside the sorting form.
+B<Defaults to:> C<< <p class="ppof_label">Disabled items</p> >>
+
+C<submit_button>
+
+    plug_preferential_order => {
+        submit_button => q|<input type="submit" class="input_submit"|
+                            . q| value="Save">|,
+    ...
+
+B<Optional>. Takes HTML code as a value that represents the submit
+button on the sorting form. This was designed with the idea to allow
+image button use; however, feel free to insert here any extra HTML code you
+require in your form. B<Defaults to:>
+C<< <input type="submit" class="input_submit" value="Save"> >>
+
+HTML::Template TEMPLATE VARIABLES
+
+    <tmpl_var name='plug_pref_order_form'>
+    <tmpl_var name='plug_pref_order_list'>
+    <tmpl_var name='plug_pref_order_disabled_list'>
+
+The plugin operates through three L<HTML::Template> variables that you
+can use in any combination. These are as follows:
+
+C<plug_pref_order_form>
+
+    <tmpl_var name='plug_pref_order_form'>
+
+This variable contains the sorting form.
+
+C<plug_pref_order_list>
+
+    <tmpl_var name='plug_pref_order_list'>
+
+This variable contains the "enabled" list. If C<has_disabled> is turned
+off while the user has some items in their "disabled" list; all of them
+will be appended to the "enabled" list.
+
+C<plug_pref_order_disabled_list>
+
+    <tmpl_var name='plug_pref_order_disabled_list'>
+
+This variable contains the "disabled" list. If C<has_disabled> is turned
+off while the user has some items in their "disabled" list; all of them
+will be appended to the "enabled" list, and this ("disabled") list will be
+empty.
+
+SAMPLE JavaScript CODE TO USED WITH THE PLUGIN
+
+This code relies on I<MooTools> (L<http://mootools.net>) JS framework to 
+operate. (I<Note:> this code also includes non-essential bit to make the
+enabled and disabled lists of constant size)
+
+    window.onload = function() {
+        setup_sortables();
+    }
+    
+    function setup_sortables() {
+        var els_list = $$('.ppof_list li');
+        var total_height = 0;
+        for ( var i = 0, l = els_list.length; i < l; i++ ) {
+            total_height += els_list[i].getSize().y;
+        }
+        $$('.ppof_list').set({'styles': {'min-height': total_height}});
+    
+        var mySortables = new Sortables('#ppof_order, #ppof_order_disabled', {
+            'constraint': true,
+            'clone': true,
+            'opacity': 0.3
+        });
+    
+        mySortables.attach();
+        $('ppof_order').zof_sortables = mySortables;
+        $('plug_preferential_order_form').onsubmit = add_sorted_list_input;
+    }
+    
+    function add_sorted_list_input() {
+        var result = $('ppof_order').zof_sortables.serialize(
+            0,
+            function(element, index){
+                return element.getProperty('id').replace('ppof_order_item_','');
+            }
+        ).join(',');
+    
+        var result_el = new Element ('input', {
+            'type': 'hidden',
+            'name': 'ppof_order',
+            'value': result
+        });
+        result_el.inject(this);
+    
+        var result_disabled = $('ppof_order').zof_sortables.serialize(
+            1,
+            function(element, index){
+                return element.getProperty('id').replace('ppof_order_item_','');
+            }
+        ).join(',');
+    
+        var result_el_disabled = new Element ('input', {
+            'type': 'hidden',
+            'name': 'ppof_order_disabled',
+            'value': result_disabled
+        });
+        result_el_disabled.inject(this);
+        return true;
+    }
+
+SAMPLE CSS CODE USED BY THE PLUGIN
+
+This is just a quick and ugly sample CSS code to give your lists some
+structure for you to quickly play with the plugin to decide if you need it:
+
+    #ppof_enabled_container,
+    #ppof_disabled_container {
+        width: 400px;
+        float: left;
+    }
+    
+    .ppof_label {
+        text-align: center;
+        font-size: 90%;
+        font-weight: bold;
+        letter-spacing: -1px;
+        padding: 0;
+        margin: 0;
+    }
+    
+    .success-message {
+        color: #aa0;
+        font-weight: bold;
+        font-size: 90%;
+    }
+    
+    .ppof_list {
+        list-style: none;
+        border: 1px solid #ccc;
+        min-height: 20px;
+        padding: 0;
+        margin: 0 0 7px;
+        background: #ffd;
+    }
+    
+    .ppof_list li {
+        padding: 10px;
+        background: #ddd;
+        border: 1px solid #aaa;
+        position: relative;
+    }
+    
+    #plug_preferential_order_form .input_submit {
+        clear: both;
+        display: block;
+    }
+
+HTML CODE GENERATED BY THE PLUGIN
+
+Sorting Form
+
+    <!-- Double list (has_disabled is set to a true value) -->
+    <form action="" method="POST" id="plug_preferential_order_form">
+    <div>
+        <input type="hidden" name="page" value="/index">
+        <input type="hidden" name="ppof_save_order" value="1">
+
+        <div id="ppof_enabled_container">
+            <p class="ppof_label">Enabled items</p>
+            <ul id="ppof_order" class="ppof_list">
+                <li id="ppof_order_item_forum4">Last forum ":)"</li>
+                <li id="ppof_order_item_forum">First forum ":)"</li>
+            </ul>
+        </div>
+
+        <div id="ppof_enabled_container">
+            <p class="ppof_label">Disabled items</p>
+            <ul id="ppof_order_disabled" class="ppof_list">
+                <li id="ppof_order_item_forum2">Second forum ":)"</li>
+                <li id="ppof_order_item_forum3">forum3</li>
+            </ul>
+        </div>
+
+        <input type="submit" class="input_submit" value="Save">
+    </div>
+    </form>
+
+    <!-- Single list (has_disabled is set to a false value) -->
+    <form action="" method="POST" id="plug_preferential_order_form">
+    <div>
+        <input type="hidden" name="page" value="/index">
+        <input type="hidden" name="ppof_save_order" value="1">
+
+        <div id="ppof_enabled_container">
+            <ul id="ppof_order" class="ppof_list">
+                <li id="ppof_order_item_forum4">Last forum ":)"</li>
+                <li id="ppof_order_item_forum">First forum ":)"</li>
+                <li id="ppof_order_item_forum2">Second forum ":)"</li>
+                <li id="ppof_order_item_forum3">forum3</li>
+            </ul>
+        </div>
+
+        <input type="submit" class="input_submit" value="Save">
+    </div>
+    </form>
+
+This form shows the default arguments for C<enabled_label>,
+C<disabled_label> and C<submit_button>. Note that C<id=""> attributes on
+the list items are partially made out of the "keys" set in C<items>
+argument. The value for C<page> hidden C<input> is derived by the 
+plugin automagically.
+
+"Enabled" Sorted List
+
+    <ul class="plug_list_html_template">
+        <li id="ppof_order_list_item_forum4">Foo:</li>
+        <li id="ppof_order_list_item_forum"><a href="#">Forum</a></li>
+    </ul>
+
+The end parts of C<id=""> attributes on the list items are derived from
+the "keys" in C<items> arrayref. Note that HTML in the values are
+not escaped.
+
+"Disabled" Sorted List
+
+    <ul class="plug_list_html_template_disabled">
+        <li id="ppof_order_list_disabled_item_forum2">Bar</li>
+        <li id="ppof_order_list_disabled_item_forum3">Meow</li>
+    </ul>
+
+The end parts of C<id=""> attributes on the list items are derived from
+the "keys" in C<items> arrayref. HTML in the values (innards of
+C<< <li> >>s) are not escaped.
+
+REQUIRED MODULES
+
+This plugins lives on these modules:
+
+    App::ZofCMS::Plugin::Base => 0.0106,
+    DBI                       => 1.607,
+    HTML::Template            => 2.9,
+
+
 =head1 App::ZofCMS::Plugin::QueryToTemplate (version 0.0102)
 
 NAME
@@ -5098,7 +9571,7 @@ and parameter C<baz> would be accessible via C<query_baz>
     Baz is: <tmpl_var name="query_baz">
 
 
-=head1 App::ZofCMS::Plugin::QuickNote (version 0.0106)
+=head1 App::ZofCMS::Plugin::QuickNote (version 0.0107)
 
 NAME
 
@@ -5279,7 +9752,7 @@ C<on_success>
 B<Optional>. Takes a string as a value that representes a key in C<{t}> special key. When
 specified, the plugin will set the C<on_success> key in C<{t}> special key to a true value
 when the quicknote has been sent; this can be used to display some special messages
-when quick note succeeds. B<By default> is not specified.
+when quick note succeeds. B<Defaults to:> C<quicknote_success>.
 
 C<on_error>
 
@@ -5351,7 +9824,921 @@ Below is the HTML code generated by the plugin. Use CSS to style it.
     </form>
 
 
-=head1 App::ZofCMS::Plugin::SplitPriceSelect (version 0.0102)
+=head1 App::ZofCMS::Plugin::RandomBashOrgQuote (version 0.0102)
+
+NAME
+
+
+Link: L<App::ZofCMS::Plugin::RandomBashOrgQuote>
+
+
+
+App::ZofCMS::Plugin::RandomBashOrgQuote - tiny plugin to fetch random quotes from http://bash.org/
+
+SYNOPSIS
+
+Include the plugin
+
+    plugins => [
+        qw/RandomBashOrgQuote/
+    ],
+
+In HTML::Template file:
+
+    <pre><tmpl_var escape='html' name='plug_random_bash_org_quote'></pre>
+
+DESCRIPTION
+
+The module is a plugin for L<App::ZofCMS> that provides means to fetch a random
+quote from L<http://bash.org/>.
+
+This documentation assumes you've read L<App::ZofCMS>, L<App::ZofCMS::Config> and
+L<App::ZofCMS::Template>
+
+TO RUN THE PLUGIN
+
+    plugins => [
+        qw/RandomBashOrgQuote/
+    ],
+
+Unlike many other plugins, this plugin does not have any configuration options and will
+run if it's included in the list of plugins to run.
+
+OUTPUT
+
+    <pre><tmpl_var escape='html' name='plug_random_bash_org_quote'></pre>
+
+Plugin will set C<< $t->{t}{plug_random_bash_org_quote} >> to the fetched random quote
+or to an error message if an error occured; in case of an error the message will be prefixed
+with C<Error:> (in case you wanna mingle with that).
+
+
+=head1 App::ZofCMS::Plugin::RandomPasswordGenerator (version 0.0102)
+
+NAME
+
+
+Link: L<App::ZofCMS::Plugin::RandomPasswordGenerator>
+
+
+
+App::ZofCMS::Plugin::RandomPasswordGenerator - easily generate random passwords with an option to use md5_hex from Digest::MD5 on them
+
+SYNOPSIS
+
+    # simple usage example; config values are plugin's defaults
+
+    plugins => [ qw/RandomPasswordGenerator/ ],
+    plug_random_password_generator => {
+        length   => 8,
+        chars    => [ 0..9, 'a'..'z', 'A'..'Z' ],
+        cell     => 'd',
+        key      => 'random_pass',
+        md5_hex  => 0,
+        pass_num => 1,
+    },
+
+    # generated password is now a string in $t->{d}{random_pass}
+    # where $t is ZofCMS Template hashref
+
+DESCRIPTION
+
+The module is a plugin for L<App::ZofCMS> that provides means to generate one or several
+random passwords and optionally use md5_hex() from L<Digest::MD5> on them.
+
+This documentation assumes you've read L<App::ZofCMS>, L<App::ZofCMS::Config> and
+L<App::ZofCMS::Template>
+
+Make sure to read C<FORMAT OF VALUES FOR GENERATED PASSWORDS> section at the end of this
+document.
+
+MAIN CONFIG FILE AND ZofCMS TEMPLATE FIRST-LEVEL KEYS
+
+C<plugins>
+
+    plugins => [ qw/RandomPasswordGenerator/ ],
+
+Self-explanatory: you need to include the plugin in the list of plugins to run.
+
+C<plug_random_password_generator>
+
+    plug_random_password_generator => {
+        length   => 8,
+        chars    => [ 0..9, 'a'..'z', 'A'..'Z' ],
+        cell     => 'd',
+        key      => 'random_pass',
+        md5_hex  => 0,
+        pass_num => 1,
+    },
+
+    plug_random_password_generator => sub {
+        my ( $t, $q, $config ) = @_;
+        return {
+            length   => 8,
+            chars    => [ 0..9, 'a'..'z', 'A'..'Z' ],
+            cell     => 'd',
+            key      => 'random_pass',
+            md5_hex  => 0,
+            pass_num => 1,
+        }
+    },
+
+B<Mandatory>. The plugin won't run unless C<plug_random_password_generator> first-level key
+is present. Takes a hashref or a subref as a value. If subref is specified,
+its return value will be assigned to C<plug_random_password_generator> as if it was already there. If sub returns
+an C<undef>, then plugin will stop further processing. The C<@_> of the subref will
+contain (in that order): ZofCMS Tempalate hashref, query parameters hashref and
+L<App::ZofCMS::Config> object. To run the plugin with all the defaults specify an
+empty hashref as a value.
+The C<plug_random_password_generator> key can be set in either (or both) Main
+Config File and ZofCMS Template;
+if set in both, the hashref keys that are set in ZofCMS Template will override the ones that
+are set in Main Config File. Possible keys/values of the hashref are as follows:
+
+C<length>
+
+    plug_random_password_generator => {
+        length   => 8,
+    }
+
+B<Optional>. Takes a positive integer as a value.
+Specifies the length - in characters - of password(s) to generate.
+B<Defaults to:> C<8>
+
+C<chars>
+
+    plug_random_password_generator => {
+        chars    => [ 0..9, 'a'..'z', 'A'..'Z' ],
+    }
+
+B<Optional>. Takes an I<arrayref> as a value. Elements of this arrayref must be characters;
+these characters specify the set of characters to be used in the generated password.
+B<Defaults to:> C<[ 0..9, 'a'..'z', 'A'..'Z' ]>
+
+C<cell>
+
+    plug_random_password_generator => {
+        cell     => 'd',
+    }
+
+B<Optional>. Takes a string specifying the name of the first-level ZofCMS Template key
+into which to create key C<key> (see below) and place the results.
+The key must be a hashref (or undef, in which case it will
+be autovivified); why? see C<key> argument below.
+B<Defaults to:> C<d>
+
+C<key>
+
+    plug_random_password_generator => {
+        key      => 'random_pass',
+    }
+
+B<Optional>. Takes a string specifying the name of the ZofCMS Template key in hashref
+specified be C<cell> (see above) into which to place the results. In other words, if C<cell>
+is set to C<d> and C<key> is set to C<random_pass> then generated password(s) will be found
+in C<< $t->{d}{random_pass} >> where C<$t> is ZofCMS Template hashref.
+B<Defaults to:> C<random_pass>
+
+C<md5_hex>
+
+    plug_random_password_generator => {
+        md5_hex  => 0,
+    }
+
+B<Optional>. Takes either true or false values. When set to a true value, the plugin will
+also generate string that is made from calling C<md5_hex()> from L<Digest::MD5> on the
+generated password. See C<FORMAT OF VALUES FOR GENERATED PASSWORDS> section below.
+B<Defaults to:> C<0>
+
+C<pass_num>
+
+    plug_random_password_generator => {
+        pass_num => 1,
+    }
+
+B<Optional>. Takes a positive integer as a value. Specifies the number of passwords to
+generate. See C<FORMAT OF VALUES FOR GENERATED PASSWORDS> section below.
+B<Defaults to:> C<1>
+
+FORMAT OF VALUES FOR GENERATED PASSWORDS
+
+Examples below assume that C<cell> argument is set to C<d> and C<key> argument is set
+to C<random_pass> (those are their defaults). The C<$VAR> is ZofCMS Template hashref, other
+keys of this hashref were removed for brevity.
+
+    # all defaults
+    $VAR1 = {
+        'd' => {
+            'random_pass' => 'ETKSeRJS',
+    ...
+
+    # md5_hex option is set to a true value, the rest are defaults
+    $VAR1 = {
+        'd' => {
+            'random_pass' => [
+                                '3b6SY9LY',                         # generated password
+                                '6e28112de1ff183966248d78a4aa1d7b'  # md5_hex() ran on it
+                             ]
+    ...
+
+    # pass_num is set to 2, the rest are defaults
+    $VAR1 = {
+        'd' => {
+            'random_pass' => [
+                                'oqdQmwZ5', # first password
+                                'NwzRv6q8'  # second password
+                             ],
+    ...
+
+    # pass_num is set to 2 and md5_hex is set to a true value
+    $VAR1 = {
+        'd' => {
+            'random_pass' => [
+                [
+                    '9itPzasC',                             # first password
+                    '5f29eb2cf6dbccc048faa9666187ac22'      # md5_hex() ran on it
+                ],
+                [
+                    'ytRRXqtq',                            # second password
+                    '81a6a7836e1d08ea2ae1c43c9dbef941'     # md5_hex() ran on it
+                ]
+            ]
+    ...
+
+There are B<four different types> of values (depending on settings) that plugin will generate.
+B<In the following text, word "output value" will be used to refer to the value of the key
+refered to by> C<key> and C<cell> plugin's arguments; in other words, if C<cell> is
+set to C<d> and C<key> is set to C<random_pass> then "output value" will be the value of
+C<< $t->{d}{random_pass} >> where C<$t> is ZofCMS Template hashref.
+
+With all the defaults output value will be a single string that is the generated password.
+
+If C<md5_hex> option is set to a true value, instead of that string the plugin will generate
+an I<arrayref> first element of which will be the generated password and second element will
+be the string generated by running C<md5_hex()> on that password.
+
+If C<pass_num> is set to a number greater than 1 then each generated password will be an
+element of an arrayref instead and output value will be an arrayref.
+
+See four examples in the beginning of this section if you are still confused.
+
+
+=head1 App::ZofCMS::Plugin::RandomPasswordGeneratorPurePerl (version 0.0103)
+
+NAME
+
+
+Link: L<App::ZofCMS::Plugin::RandomPasswordGeneratorPurePerl>
+
+
+
+App::ZofCMS::Plugin::RandomPasswordGenerator - easily generate random passwords with an option to use md5_hex from Digest::MD5 on them | Pure perl solution
+
+SYNOPSIS
+
+    # simple usage example; config values are plugin's defaults
+
+    plugins => [ qw/RandomPasswordGeneratorPurePerl/ ],
+    plug_random_password_generator_pure_perl_pure_perl => {
+        length   => 8,
+        chars    => [ 0..9, 'a'..'z', 'A'..'Z' ],
+        cell     => 'd',
+        key      => 'random_pass',
+        md5_hex  => 0,
+        pass_num => 1,
+    },
+
+    # generated password is now a string in $t->{d}{random_pass}
+    # where $t is ZofCMS Template hashref
+
+DESCRIPTION
+
+The module is a plugin for L<App::ZofCMS> that provides means to generate one or several
+random passwords and optionally use md5_hex() from L<Digest::MD5> on them.
+
+B<This plugin is is a drop-in replacement of> L<App::ZofCMS::Plugin::RandomPasswordGenerator>
+B<that requires modules that require C compiler> (this module got simpler logic
+and does not require anything fancy)
+
+This documentation assumes you've read L<App::ZofCMS>, L<App::ZofCMS::Config> and
+L<App::ZofCMS::Template>
+
+Make sure to read C<FORMAT OF VALUES FOR GENERATED PASSWORDS> section at the end of this
+document.
+
+MAIN CONFIG FILE AND ZofCMS TEMPLATE FIRST-LEVEL KEYS
+
+C<plugins>
+
+    plugins => [ qw/RandomPasswordGeneratorPurePerl/ ],
+
+Self-explanatory: you need to include the plugin in the list of plugins to run.
+
+C<plug_random_password_generator_pure_perl>
+
+    plug_random_password_generator_pure_perl => {
+        length   => 8,
+        chars    => [ 0..9, 'a'..'z', 'A'..'Z' ],
+        cell     => 'd',
+        key      => 'random_pass',
+        md5_hex  => 0,
+        pass_num => 1,
+    },
+
+    plug_random_password_generator_pure_perl => sub {
+        my ( $t, $q, $config ) = @_;
+        return {
+            length   => 8,
+        },
+    },
+
+B<Mandatory>. The plugin won't run unless C<plug_random_password_generator_pure_perl> first-level key
+is present. Takes a hashref or a subref as a value. If subref is specified,
+its return value will be assigned to C<plug_random_password_generator_pure_perl>
+as if it was already there. If sub returns
+an C<undef>, then plugin will stop further processing. The C<@_> of the subref will
+contain (in that order): ZofCMS Tempalate hashref, query parameters hashref and
+L<App::ZofCMS::Config> object. To run the plugin with all the defaults specify an
+empty hashref as a value.
+The C<plug_random_password_generator_pure_perl> key can be set in either (or both) Main
+Config File and ZofCMS Template;
+if set in both, the hashref keys that are set in ZofCMS Template will override the ones that
+are set in Main Config File. Possible keys/values of the hashref are as follows:
+
+C<length>
+
+    plug_random_password_generator_pure_perl => {
+        length   => 8,
+    }
+
+B<Optional>. Takes a positive integer as a value.
+Specifies the length - in characters - of password(s) to generate.
+B<Defaults to:> C<8>
+
+C<chars>
+
+    plug_random_password_generator_pure_perl => {
+        chars    => [ 0..9, 'a'..'z', 'A'..'Z' ],
+    }
+
+B<Optional>. Takes an I<arrayref> as a value. Elements of this arrayref must be characters;
+these characters specify the set of characters to be used in the generated password.
+B<Defaults to:> C<[ 0..9, 'a'..'z', 'A'..'Z' ]>
+
+C<cell>
+
+    plug_random_password_generator_pure_perl => {
+        cell     => 'd',
+    }
+
+B<Optional>. Takes a string specifying the name of the first-level ZofCMS Template key
+into which to create key C<key> (see below) and place the results.
+The key must be a hashref (or undef, in which case it will
+be autovivified); why? see C<key> argument below.
+B<Defaults to:> C<d>
+
+C<key>
+
+    plug_random_password_generator_pure_perl => {
+        key      => 'random_pass',
+    }
+
+B<Optional>. Takes a string specifying the name of the ZofCMS Template key in hashref
+specified be C<cell> (see above) into which to place the results. In other words, if C<cell>
+is set to C<d> and C<key> is set to C<random_pass> then generated password(s) will be found
+in C<< $t->{d}{random_pass} >> where C<$t> is ZofCMS Template hashref.
+B<Defaults to:> C<random_pass>
+
+C<md5_hex>
+
+    plug_random_password_generator_pure_perl => {
+        md5_hex  => 0,
+    }
+
+B<Optional>. Takes either true or false values. When set to a true value, the plugin will
+also generate string that is made from calling C<md5_hex()> from L<Digest::MD5> on the
+generated password. See C<FORMAT OF VALUES FOR GENERATED PASSWORDS> section below.
+B<Defaults to:> C<0>
+
+C<pass_num>
+
+    plug_random_password_generator_pure_perl => {
+        pass_num => 1,
+    }
+
+B<Optional>. Takes a positive integer as a value. Specifies the number of passwords to
+generate. See C<FORMAT OF VALUES FOR GENERATED PASSWORDS> section below.
+B<Defaults to:> C<1>
+
+FORMAT OF VALUES FOR GENERATED PASSWORDS
+
+Examples below assume that C<cell> argument is set to C<d> and C<key> argument is set
+to C<random_pass> (those are their defaults). The C<$VAR> is ZofCMS Template hashref, other
+keys of this hashref were removed for brevity.
+
+    # all defaults
+    $VAR1 = {
+        'd' => {
+            'random_pass' => 'ETKSeRJS',
+    ...
+
+    # md5_hex option is set to a true value, the rest are defaults
+    $VAR1 = {
+        'd' => {
+            'random_pass' => [
+                                '3b6SY9LY',                         # generated password
+                                '6e28112de1ff183966248d78a4aa1d7b'  # md5_hex() ran on it
+                             ]
+    ...
+
+    # pass_num is set to 2, the rest are defaults
+    $VAR1 = {
+        'd' => {
+            'random_pass' => [
+                                'oqdQmwZ5', # first password
+                                'NwzRv6q8'  # second password
+                             ],
+    ...
+
+    # pass_num is set to 2 and md5_hex is set to a true value
+    $VAR1 = {
+        'd' => {
+            'random_pass' => [
+                [
+                    '9itPzasC',                             # first password
+                    '5f29eb2cf6dbccc048faa9666187ac22'      # md5_hex() ran on it
+                ],
+                [
+                    'ytRRXqtq',                            # second password
+                    '81a6a7836e1d08ea2ae1c43c9dbef941'     # md5_hex() ran on it
+                ]
+            ]
+    ...
+
+There are B<four different types> of values (depending on settings) that plugin will generate.
+B<In the following text, word "output value" will be used to refer to the value of the key
+refered to by> C<key> and C<cell> plugin's arguments; in other words, if C<cell> is
+set to C<d> and C<key> is set to C<random_pass> then "output value" will be the value of
+C<< $t->{d}{random_pass} >> where C<$t> is ZofCMS Template hashref.
+
+With all the defaults output value will be a single string that is the generated password.
+
+If C<md5_hex> option is set to a true value, instead of that string the plugin will generate
+an I<arrayref> first element of which will be the generated password and second element will
+be the string generated by running C<md5_hex()> on that password.
+
+If C<pass_num> is set to a number greater than 1 then each generated password will be an
+element of an arrayref instead and output value will be an arrayref.
+
+See four examples in the beginning of this section if you are still confused.
+
+
+=head1 App::ZofCMS::Plugin::Search::Indexer (version 0.0102)
+
+NAME
+
+
+Link: L<App::ZofCMS::Plugin::Search::Indexer>
+
+
+
+App::ZofCMS::Plugin::Search::Indexer - plugin that incorporates Search::Indexer module's functionality
+
+SYNOPSIS
+
+    plugins => [ qw/Search::Indexer/ ],
+    plug_search_indexer => {
+        # most of these values are optional
+        dir         => 'index_files',
+        cell        => 'd',
+        key         => 'search_indexer',
+        obj_args    => [],
+        exact_match => 0,
+        add   => { id1 => 'text to index', },
+        remove => [ qw/id1 id2 id3/ ],
+        search => 'foo bar baz',
+    },
+
+DESCRIPTION
+
+The module is a plugin for L<App::ZofCMS> that incorporates (partial) L<Search::Indexer>
+functionality in a form of ZofCMS plugin. In other words, plugin allows one to create a
+search index from a bunch of data and later on perform search on that index. See
+docs for L<Search::Indexer> for more details.
+
+This documentation assumes you've read L<App::ZofCMS>, L<App::ZofCMS::Config> and
+L<App::ZofCMS::Template> as well as familiar with L<Search::Indexer>, at least lightly.
+
+FIRST-LEVEL ZofCMS TEMPLATE AND MAIN CONFIG FILE KEYS
+
+C<plugins>
+
+    plugins => [ qw/Search::Indexer/ ],
+
+You need to add the plugin into the list of plugins to execute.
+
+C<plug_search_indexer>
+
+    plug_search_indexer => {
+        # most of these values are optional
+        dir         => 'index_files',
+        cell        => 'd',
+        key         => 'search_indexer',
+        obj_args    => [],
+        exact_match => 0,
+        add   => { id1 => 'text to index', },
+        remove => [ qw/id1 id2 id3/ ],
+        search => 'foo bar baz',
+    },
+
+    plug_search_indexer => sub {
+        my ( $t, $q, $conf ) = @_;
+        return {
+            add   => { id1 => 'text to index', },
+        };
+    },
+
+B<Mandatory>. The C<plug_search_indexer> first-level key can be specified in either ZofCMS
+Template or Main Config File (or both). Its value can be either a subref or a hashref; if the
+value is a subref it will be evaluated and it must return a hashref (or undef/empty list). This
+hashref will be treated as if you directly assigned it to C<plug_search_indexer> key. The
+C<@_> of that subref will contain the following C<$t, $q, $conf> where C<$t> is ZofCMS
+Template hashref, C<$q> is a hashref of query parameters and C<$conf> is L<App::ZofCMS::Config>
+object. Possible keys/values of C<plug_search_indexer> hashref are as follows:
+
+C<dir>
+
+    dir         => 'index_files',
+
+B<Optional>. Specifies the directory where index files are located. Corresponds to C<dir>
+argument of L<Search::Indexer> C<new()> method. B<Defaults to:> C<index_files> (and is relative
+to C<index.pl> file).
+
+C<obj_args>
+
+    obj_args    => [],
+
+B<Optional>. Takes an arrayref as a value, this arrayref will be directly dereferenced into
+L<Search::Indexer>'s constructor (C<new()> method). The C<writeMode> argument will be set
+by the plugin to a true value if C<add> or C<remove> keys (see below) are set. The C<dir>
+argument will be derived from plugin's C<dir> key. The arrayref will be dereferenced I<after>
+the C<dir> and C<writeMode> arguments, thus you can use C<obj_args> to override them.
+See documentation for L<Search::Indexer> for possible values that you can set in
+C<obj_args>. B<Defaults to:> C<[]> (empty arrayref).
+
+C<cell>
+
+    cell => 'd',
+
+B<Optional>. Specifies first-level ZofCMS Template key into which to put search results (when
+search
+is performed). See C<key> argument below. B<Defaults to:> C<d>
+
+C<key>
+
+    key => 'search_indexer',
+
+B<Optional>. Specifies the name of the key inside C<cell> first-level key into which to put search results (when search
+is performed). See C<cell> argument below. Basically, if C<cell> is set to C<d> and
+C<key> is set to C<search_indexer> then search results will be stored in
+C<< $t->{d}{search_indexer} >> where C<$t> is ZofCMS Template hashref. B<Defaults to:>
+C<search_indexer>
+
+C<exact_match>
+
+    exact_match => 0,
+
+B<Optional>. Takes either true or false values. Will be given as second parameter to
+L<Search::Indexer>'s C<search()> method; thus if it is set to true all the search words without
+prefix will have C<+> added to them. B<Defaults to:> C<0>
+
+C<add>
+
+    add   => {
+        id1 => 'text to index',
+        id2 => 'other text to index',
+    },
+
+B<Optional>. When specified, instructs the plugin to add stuff into index. Takes a hashref
+as a value where keys are IDs and values are text to index under those IDs.
+
+C<remove>
+
+    remove => [ qw/id1 id2 id3/ ],
+
+    remove => {
+        id1     => 'containing text',
+        id2     => 'other containing text'
+    },
+
+B<Optional>. Takes either a hashref or an arrayref as a value. Elements of the arrayref would
+be IDs of records to remove from the index. You'd use the hashref form when C<positions>
+argument in C<obj_args> arrayref would be set to a false value (by default it's true); when
+that's the case, the keys of hashref would be IDs and values would be corresponding texts.
+See C<remove()> method and C<positions> argument to C<new()> method in L<Search::Indexer>
+
+C<search>
+
+    search => 'foo bar baz',
+
+B<Optional>. Takes a string as a value. This string will be given to
+L<Search::Indexer>'s C<search()> method as a first argument, i.e. the text for which to search.
+The return value will be the same as return value of L<Search::Indexer>'s C<search()> method
+and it will be assigned to C<< $t->{ <cell> }{ <key> } >> where C<$t> is ZofCMS Template
+hashref and C<< <cell> >> and C<< <key> >> are C<cell> and C<key> plugin's arguments
+respectively.
+
+SEE ALSO
+
+L<App::ZofCMS>, L<Search::Indexer>
+
+
+=head1 App::ZofCMS::Plugin::SendFile (version 0.0103)
+
+NAME
+
+
+Link: L<App::ZofCMS::Plugin::SendFile>
+
+
+
+App::ZofCMS::Plugin::SendFile - plugin for flexible sending of files as well as files outside of web-accessible directory
+
+SYNOPSIS
+
+In your ZofCMS Template or Main Config File:
+
+    plugins => [ qw/SendFile/ ],
+
+    plug_send_file => [
+        '../zcms_site/config.txt',  # filename to send; this one is outside the webdir
+        'attachment',               # optional to set content-disposition to attachment
+        'text/plain',               # optional to set content-type instead of guessing one
+        'LOL.txt',                  # optional to set filename instead of using same as original
+    ],
+
+In your HTML::Template template:
+
+    <tmpl_if name='plug_send_file_error'>
+        <p class="error">Got error: <tmpl_var escape='html' name='plug_send_file_error'></p>
+    </tmpl_if>
+
+DESCRIPTION
+
+The module is a plugin for L<App::ZofCMS> that provides means for flexible sending of files
+(e.g. sending it as an attachment (for download) or changing the filename), most important
+feature of the plugin is that you can use it to send files outside of web-accessible
+directory which in conjunction with say L<App::ZofCMS::Plugin::UserLogin> can provide user
+account restricted file sending.
+
+This documentation assumes you've read L<App::ZofCMS>, L<App::ZofCMS::Config> and
+L<App::ZofCMS::Template>
+
+FIRST-LEVEL ZofCMS TEMPLATE AND MAIN CONFIG FILE KEYS
+
+C<plugins> and notes on exiting
+
+    plugins => [ qw/SendFile/ ],
+
+    plugins => [
+        { UserLogin => 200 },
+        { SendFile  => 300 },
+    ],
+
+We need to include the plugin in the list of plugins to execute; ensure to get the right
+priority if you're using other plugins.
+
+B<NOTE:> unless an error occurs, the plugins calls C<exit()> when it's done sending the file,
+make sure that all the required plugins had their chance to execute BEFORE this one.
+
+C<plug_send_file>
+
+    plug_send_file => 'foo.txt', # file to send
+
+    plug_send_file => [
+        '../zcms_site/config.txt',  # filename to send; this one is outside the webdir
+        'attachment',               # optional to set content-disposition to attachment
+        'text/plain',               # optional to set content-type instead of guessing one
+        'LOL.txt',                  # optional to set filename instead of using same as original
+    ],
+
+    plug_send_file => sub {
+        my ( $t, $q, $conf ) = @_;
+        return 'foo.txt';
+    },
+
+B<Mandatory>. Takes either a string, subref or an arrayref as a value, can be specified in
+either ZofCMS Template or Main Config File; if set in both, the value in ZofCMS Template is
+used.
+
+When set to a subref, the sub will be executed and its return value will be assigned to the key; returning C<undef> will stop the plugin from execution. The C<@_> will contain
+(in that order): ZofCMS Template hashref, query parameters hashref, L<App::ZofCMS::Config>
+object.
+
+When set to a string it's the same as setting to an arrayref with just one value in it.
+
+Here are how arrayref elements are interpreted:
+
+FIRST ELEMENT
+
+    plug_send_file => [
+        '../zcms_site/config.txt',
+    ],
+
+B<Mandatory>. Specifies the name of the file to send. The filename is relative to C<index.pl>
+and can be outside of webroot. Note that if you're taking this name from the user, it's up
+to you to ensure that it's safe.
+
+SECOND ELEMENT
+
+    plug_send_file => [
+        '../zcms_site/config.txt',
+        'attachment',
+    ],
+
+B<Optional>. Specifies C<Content-Disposition> type, which can be C<inline>, C<attachment> or
+an extension-token. See RFC 2183 for details.
+B<Note:> this parameter only takes the TYPE not the whole header (which isn't supported by
+the plugin so you'll have to modify it if you need this). B<Defaults to:> C<inline>, you can
+set this to C<undef> to take it's default value.
+
+THIRD ELEMENT
+
+    plug_send_file => [
+        '../zcms_site/config.txt',
+        undef,
+        'text/plain',
+    ]
+
+B<Optional>. Specifies the C<Content-Type> to use. When set to C<undef>, the plugin will
+try to guess the correct type to use using C<MIME::Types> module.
+B<Defauts to:> C<undef>
+
+FOURTH ELEMENT
+
+    plug_send_file => [
+        '../zcms_site/config.txt',
+        undef,
+        undef,
+        'LOL.txt',
+    ],
+
+B<Optional>. Speficies the filename to use when sending the file. Note that this applies
+even when content disposition type is set to C<inline> for when the user would want
+to save the file. When set to C<undef>, the plugin will use the same name as the original
+file. B<Defaults to:> C<undef>.
+
+HTML::Template VARIABLES - ERROR HANDLING
+
+C<plug_send_file_error>
+
+    <tmpl_if name='plug_send_file_error'>
+        <p class="error">Got error: <tmpl_var escape='html' name='plug_send_file_error'></p>
+    </tmpl_if>
+
+If the plugin cannot read the file you specified for sending, it will set the
+C<plug_send_file_error> key inside C<t> ZofCMS Template special key to the error message (to
+the value of C<$!> to be specific) and will stop processing (i.e. won't send any files
+or C<exit()>).
+
+"default" Content-Type
+
+If plugin was told to derive the right Content-Type of the file, but it couldn't derive one,
+it will use C<application/octet-stream>
+
+
+=head1 App::ZofCMS::Plugin::Session (version 0.0102)
+
+NAME
+
+
+Link: L<App::ZofCMS::Plugin::Session>
+
+
+
+App::ZofCMS::Plugin::Session - plugin for storing data across requests
+
+SYNOPSIS
+
+    plugins => [
+        { Session => 2000 },
+        { Sub     => 3000 },
+    ],
+
+    plugins2 => [
+        qw/Session/,
+    ],
+
+    plug_session => {
+        dsn     => "DBI:mysql:database=test;host=localhost",
+        user    => 'test',
+        pass    => 'test',
+    },
+
+    plug_sub => sub {
+        my $t = shift;
+        $t->{d}{session}{time} = localtime;
+    },
+
+DESCRIPTION
+
+The module is a plugin for L<App::ZofCMS> that provides means to store data across HTTP
+requests.
+
+B<The docs for this plugin are incomplete>
+
+B<This plugin requires ZofCMS version of at least 0.0211 where multi-level plugin sets are implemented>
+
+This documentation assumes you've read L<App::ZofCMS>, L<App::ZofCMS::Config> and L<App::ZofCMS::Template>
+
+FIRST-LEVEL ZofCMS TEMPLATE AND MAIN CONFIG FILE KEYS
+
+C<plugins>
+
+    plugins => [
+        qw/Session/,
+    ],
+
+    plugins2 => [
+        qw/Session/,
+    ],
+
+B<Important>. This plugin requires to be executed twice. On first execution [currently]
+it will load the session data into C<< $t->{d}{session} >> where C<$t> is ZofCMS Template
+hashref. On second execution, it will save that data into an SQL table.
+
+C<plug_session>
+
+    plug_session => {
+        dsn     => "DBI:mysql:database=test;host=localhost",
+        user    => 'test',
+        pass    => 'test',
+        opt     => { RaiseError => 1, AutoCommit => 1 },
+        create_table => 1,
+    },
+
+B<Mandatory>. The C<plug_session> key takes a hashref as a value. The possible keys/values of that hashref are described below. B<There are quite a few more options to come - see source
+code - but those are untested and may be changed, thus use them at your own risk.>
+
+C<dsn>
+
+    dsn => "DBI:mysql:database=test;host=localhost",
+
+B<Mandatory>. Specifies the DSN for database, see L<DBI> for more information on what to use
+here.
+
+C<user> and C<pass>
+
+        user    => 'test',
+        pass    => 'test',
+
+B<Semi-optional>. The C<user> and C<pass> key should contain username and password for
+the SQL database that plugin will use. B<Defaults are:> C<user> is C<root> and C<pass> is set
+to C<undef>.
+
+C<opt>
+
+    opt => { RaiseError => 1, AutoCommit => 0 },
+
+The C<opt> key takes a hashref of any additional options you want to
+pass to C<connect_cached> L<DBI>'s method.
+
+B<Defaults to:> C<< { RaiseError => 1, AutoCommit => 0 }, >>
+
+C<table>
+
+    table   => 'session',
+
+B<Optional>. Takes a string as a value. Specifies the name of the SQL table that plugin
+will use to store data. B<Defaults to:> C<session>
+
+C<create_table>
+
+    create_table => 1,
+
+B<Optional>. Takes either true or false values. When set to a true value, the plugin will
+automatically create the database table that it nees for operation. B<Defaults to:> C<0>.
+Here is the table that it creates (C<$conf{table}> is the C<table> plugin's argument):
+
+    CREATE TABLE `$conf{table}` (
+        `id`      TEXT,
+        `time`    VARCHAR(10),
+        `data`    TEXT
+    );
+
+USAGE
+
+Currently just store your data in C<< $t->{d}{session} >>. I suggest you use it as a hashref.
+
+More options to come soon!
+
+MORE INFO
+
+See source code, much of it is understandable (e.g. that session cookies last for 24 hours).
+I'll write better documentation once I get more time.
+
+
+=head1 App::ZofCMS::Plugin::SplitPriceSelect (version 0.0103)
 
 NAME
 
@@ -5408,7 +10795,23 @@ C<plug_split_price_select>
         dollar_sign => 1,
     }
 
-The C<plug_split_price_select> first-level key takes a hashref as a value. If a certain key
+    plug_split_price_select => sub {
+        my ( $t, $q, $config ) = @_;
+        return {
+            prices      => [ qw/foo bar baz/ ],
+            t_name      => 'plug_split_price_select',
+            options     => 3,
+            name        => 'plug_split_price_select',
+            id          => 'plug_split_price_select',
+            dollar_sign => 1,
+        };
+    }
+
+The C<plug_split_price_select> first-level key takes a hashref or a subref as a value. If subref is specified,
+its return value will be assigned to C<plug_split_price_select> as if it was already there. If sub returns
+an C<undef>, then plugin will stop further processing. The C<@_> of the subref will
+contain (in that order): ZofCMS Tempalate hashref, query parameters hashref and
+L<App::ZofCMS::Config> object. If a certain key
 in that hashref is specified in both, Main Config File and ZofCMS Template, then the
 value given in ZofCMS Template will take precedence. Plugin will not run if
 C<plug_split_price_select> is not specified (or if C<prices> key's arrayref is empty).
@@ -5491,7 +10894,7 @@ arguments are left at their default values):
     </select>
 
 
-=head1 App::ZofCMS::Plugin::StyleSwitcher (version 0.0101)
+=head1 App::ZofCMS::Plugin::StyleSwitcher (version 0.0102)
 
 NAME
 
@@ -5567,8 +10970,22 @@ C<plug_style_switcher>
         },
     },
 
+    plug_style_switcher => sub {
+        my ( $t, $q, $config ) = @_;
+        return {
+            dsn                     => "DBI:mysql:database=test;host=localhost",
+            user                    => 'test',
+            pass                    => 'test',
+        }
+    },
+
 The plugin reads it's configuration from L<plug_style_switcher> first-level ZofCMS Template
-or Main Config file template. Keys that are set in ZofCMS Template will override same
+or Main Config file template. Takes a hashref or a subref as a value. If subref is specified,
+its return value will be assigned to C<plug_style_switcher>
+as if it was already there. If sub returns
+an C<undef>, then plugin will stop further processing. The C<@_> of the subref will
+contain (in that order): ZofCMS Tempalate hashref, query parameters hashref and
+L<App::ZofCMS::Config> object. Keys that are set in ZofCMS Template will override same
 ones that are set in Main Config file. Considering that you'd want the CSS style settings
 to be set on an entire site, it only makes sense to set this plugin up in your Main Config
 file.
@@ -6798,7 +12215,7 @@ The example above will generate the following code:
 Note: the class of the C<< <ul> >> element is always C<page_toc>
 
 
-=head1 App::ZofCMS::Plugin::UserLogin (version 0.0103)
+=head1 App::ZofCMS::Plugin::UserLogin (version 0.0212)
 
 NAME
 
@@ -6843,6 +12260,12 @@ Main config file:
         redirect_on_logout      => '/',
         not_restricted          => [ qw(/ /index) ],
         restricted              => [ qr/^/ ],
+        smart_deny              => 'login_redirect_page',
+        preserve_login          => 'my_site_login',
+        login_button => '<input type="submit"
+            class="input_submit" value="Login">',
+        logout_button => '<input type="submit"
+            class="input_submit" value="Logout">',
     },
 
 In L<HTML::Template> template for C<'/login'> page:
@@ -6860,6 +12283,11 @@ Plugin uses HTTP cookies to set user sessions.
 
 This documentation assumes you've read L<App::ZofCMS>,
 L<App::ZofCMS::Config> and L<App::ZofCMS::Template>
+
+NOTE ON LOGINS
+
+Plugin makes the logins B<lowercased> when doing its processing; thus C<FooBar> login
+is the same as C<foobar>.
 
 NOTE ON REDIRECTS
 
@@ -6905,6 +12333,12 @@ TEMPLATE/CONFIG FILE SETTINGS
         redirect_on_logout      => '/',
         not_restricted          => [ qw(/ /index) ],
         restricted              => [ qr/^/ ],
+        smart_deny              => 'login_redirect_page',
+        preserve_login          => 'my_site_login',
+        login_button => '<input type="submit"
+            class="input_submit" value="Login">',
+        logout_button => '<input type="submit"
+            class="input_submit" value="Logout">',
     },
 
 These settings can be set via C<plug_login> first-level key in ZofCMS
@@ -6998,6 +12432,49 @@ C<redirect_on_login>
 
 B<Optional>. Specifies the URI to which to redirect after user successfully
 logged in. B<By default> is not specified.
+
+C<smart_deny>
+
+    smart_deny => 'login_redirect_page',
+
+B<Optional>. Takes a scalar as a value that represents a query parameter
+name into which to store the URI of the page that not-logged-in  user
+attempted to access. This option works only when C<redirect_on_login> is
+specified. When specified, plugin enables the magic to "remember" the page
+that a not-logged-in user tried to access, and once the user enters correct
+login credentials, he is redirected to said page automatically; thereby
+making the login process transparent. B<By default> is not specified.
+
+C<preserve_login>
+
+    preserve_login => 'my_site_login',
+
+B<Optional>. Takes a scalar that represents the name of a cookie
+as a value. When specified, the plugin will automatically
+(via the cookie, name of which you specify here) remember, and fill
+out, the username from last successfull login. This option only works
+when C<no_cookies> is set to a false value (that's the default).
+B<By default> is not specified
+
+C<login_button>
+
+    login_button => '<input type="submit"
+            class="input_submit" value="Login">',
+
+B<Optional>. Takes HTML code for the login button, though, feel free to
+use it as an insertion point for any extra code you might want in your
+login form. B<Defaults to:>
+C<< <input type="submit" class="input_submit" value="Login"> >>
+
+C<logout_button>
+
+    logout_button => '<input type="submit"
+        class="input_submit" value="Logout">'
+
+B<Optional>. Takes HTML code for the logout button, though, feel free to
+use it as an insertion point for any extra code you might want in your
+logout form. B<Defaults to:>
+C<< <input type="submit" class="input_submit" value="Logout"> >>
 
 C<redirect_on_logout>
 
@@ -7142,6 +12619,7 @@ B<Optional>. When set to a false value plugin will set two cookies:
 C<md5_hex()>ed user login and session ID. When set to a true value plugin
 will not set any cookies and instead will put session ID into
 C<plug_login_session_id> key under ZofCMS template's C<{t}> special key.
+B<By default> is not specified (false).
 
 HTML::Template TEMPLATE
 
@@ -7213,14 +12691,14 @@ login form with a login error
         <ul>
             <li>
                 <label for="zofcms_plugin_login_login">Login: </label
-                ><input type="text" name="login" id="zofcms_plugin_login_login">
+                ><input type="text" class="input_text" name="login" id="zofcms_plugin_login_login">
             </li>
             <li>
                 <label for="zofcms_plugin_login_pass">Password: </label
-                ><input type="password" name="pass" id="zofcms_plugin_login_pass">
+                ><input type="password" class="input_password" name="pass" id="zofcms_plugin_login_pass">
             </li>
         </ul>
-        <input type="submit" value="Login">
+        <input type="submit" class="input_submit" value="Login">
     </div>
     </form>
 
@@ -7230,9 +12708,1009 @@ logout form
     <div>
         <input type="hidden" name="page" value="/login">
         <input type="hidden" name="zofcms_plugin_login" value="logout_user">
-        <input type="submit" value="Logout">
+        <input type="submit" class="input_submit" value="Logout">
     </div>
     </form>
+
+
+=head1 App::ZofCMS::Plugin::UserLogin::ChangePassword (version 0.0110)
+
+NAME
+
+
+Link: L<App::ZofCMS::Plugin::UserLogin::ChangePassword>
+
+
+
+App::ZofCMS::Plugin::UserLogin::ChangePassword - UserLogin plugin suppliment for changing user passwords
+
+SYNOPSIS
+
+In your Main Config File or ZofCMS Template:
+
+    plugins => [
+        { UserLogin                   => 200  },
+        { 'UserLogin::ChangePassword' => 1000 },
+    ],
+
+    plug_user_login_change_password => {
+        dsn     => "DBI:mysql:database=hl;host=localhost",
+        login   => 'test',
+        pass    => 'test',
+    },
+
+    # UserLogin plugin's configuration skipped for brevity
+
+In your HTML::Template template:
+
+    <tmpl_var name='change_pass_form'>
+
+DESCRIPTION
+
+The module is a plugin for L<App::ZofCMS> that provides means to display and process the
+"change password" form. This plugin was designed with an assumption that you are using
+L<App::ZofCMS::Plugin::UserLogin>, but that's not a requirement.
+
+This documentation assumes you've read L<App::ZofCMS>, L<App::ZofCMS::Config> and L<App::ZofCMS::Template>
+
+FIRST-LEVEL ZofCMS TEMPLATE AND MAIN CONFIG FILE KEYS
+
+C<plugins>
+
+    plugins => [
+        { 'UserLogin::ChangePassword' => 2000 },
+    ],
+
+B<Mandatory>. You need to include the plugin in the list of plugins to execute. By default
+this plugin is configured to interface with L<App::ZofCMS::UserLogin> plugin, thus you'd
+include UserLogin plugin with lower priority sequence to execute earlier.
+
+C<plug_user_login_change_password>
+
+    plug_user_login_change_password => {
+        dsn     => "DBI:mysql:database=test;host=localhost",
+        user    => 'test',
+        pass    => 'test',
+        opt     => { RaiseError => 1, AutoCommit => 1 },
+        table   => 'users',
+        login   => sub { $_[0]{d}{user}{login} },
+        key     => 'change_pass_form',
+        min     => 4,
+        submit_button => q|<input type="submit" class="input_submit"|
+            . q| name="plug_user_login_change_password_submit"|
+            . q| value="Change password">|,
+    },
+
+    # or set arguments via a subref
+    plug_user_login_change_password => sub {
+        my ( $t, $q, $config ) = @_;
+        return {
+            dsn => "DBI:mysql:database=test;host=localhost",
+        },
+    },
+
+B<Mandatory>. Takes either a hashref or a subref as a value. If subref is specified,
+its return value will be assigned to C<plug_user_login_change_password> as if it was already
+there. If sub returns
+an C<undef>, then plugin will stop further processing. The C<@_> of the subref will
+contain (in that order): ZofCMS Tempalate hashref, query parameters hashref and
+L<App::ZofCMS::Config> object. To run with all the defaults (which won't be the case for
+nearly everything but testing environment) set to empty hashref.
+Possible keys/values for the hashref are as follows:
+
+C<dsn>
+
+    plug_user_login_change_password => sub {
+        dsn => "DBI:mysql:database=test;host=localhost",
+    },
+
+B<Optional>. Specifies L<DBI>'s "dsn" (driver, database and host) for the plugin to use.
+See L<App::ZofCMS::UserLogin> for more details; this one needs to point to the
+same database that UserLogin plugin uses so the right password could be changed.
+B<Defaults to:> C<DBI:mysql:database=test;host=localhost>  (as I've said, useful only for
+testing enviroment)
+
+C<user>
+
+    plug_user_login_change_password => sub {
+        user    => 'test',
+    },
+
+B<Optional>. Specifies the username for database access. B<Defaults to:> C<test>
+
+C<pass>
+
+    plug_user_login_change_password => sub {
+        pass    => 'test',
+    },
+
+B<Optional>. Specifies the password for database access. B<Defaults to:> C<test>
+
+C<opt>
+
+    plug_user_login_change_password => sub {
+        opt => { RaiseError => 1, AutoCommit => 1 },
+    },
+
+B<Optional>. Specifies additional L<DBI> options. See L<App::ZofCMS::Plugin::UserLogin>'s
+C<opt> argument for more details. B<Defaults to:> C<< { RaiseError => 1, AutoCommit => 1 } >>
+
+C<table>
+
+    plug_user_login_change_password => sub {
+        table   => 'users',
+    },
+
+B<Optional>. Specifies the SQL table used in L<App::ZofCMS::Plugin::UserLogin>. Actually,
+you do not have to use UserLogin plugin, but the passwords must be stored in a column
+named C<password>. B<Defaults to:> C<users>
+
+C<login>
+
+    plug_user_login_change_password => sub {
+        login   => 'admin',
+    },
+
+    plug_user_login_change_password => sub {
+        login   => sub { $_[0]{d}{user}{login} },
+    },
+
+B<Optional>. Specifies the login of the user whose password to chagne.
+Takes either a string or a subref as a value. If subref is specified, its
+return value will be assigned to C<login> as if it was already there.
+The C<@_> of the subref will contain (in that order): ZofCMS Template hashref, query
+parameters hashref and L<App::ZofCMS::Config> object.
+B<Defaults to:> C<sub { $_[0]{d}{user}{login} }> (my common way of storing C<$user_ref> from
+UserLogin plugin)
+
+C<key>
+
+    plug_user_login_change_password => sub {
+        key     => 'change_pass_form',
+    },
+
+B<Optional>. Specifies the name of the key inside C<{t}> special key into which
+the plugin will put the password change form (see PLUGIN'S HTML AND OUTPUT section for
+details).
+B<Defaults to:> C<change_pass_form>
+
+C<min>
+
+    plug_user_login_change_password => sub {
+        min     => 4,
+    },
+
+B<Optional>. Takes a positive intereger or zero as a value. Specifies
+the minimum C<length()> of the new password. B<Defaults to:> C<4>
+
+C<submit_button>
+
+    plug_user_login_change_password => sub {
+        submit_button => q|<input type="submit" class="input_submit"|
+            . q| name="plug_user_login_change_password_submit"|
+            . q| value="Change password">|,
+    },
+
+B<Optional>. Takes a string of HTML code as a value. Specifies the
+code for the submit button of the form; feel free to add any extra
+code you might require as well. B<Defaults to:>
+C<< <input type="submit" class="input_submit"  name="plug_user_login_change_password_submit" value="Change password"> >>
+
+PLUGIN'S HTML AND OUTPUT
+
+The plugin uses key in C<{t}> special key that is specified via C<key> plugin's configuration
+argument (defaults to C<change_pass_form>). That key will contain either the HTML
+form for password changing or the message that password was successfully changed.
+
+If an error occured (such as mismatching passwords), plugin will set 
+C<< $t->{t}{plug_user_login_change_password_error} >> to a true value (where C<$t> is
+ZofCMS Template hashref). If password was successfully changed, plugin will set
+C<< $t->{t}{plug_user_login_change_password_ok} >> to a true value (where C<$t> is
+ZofCMS Template hashref). You do not have to use these, as they are set only if you have
+a large page and want to hide/show different bits depending on what is going on.
+
+Below is the HTML::Template template that plugin uses for the form as well as successfully
+password changes. It is shown here for you to know how to style your password changing
+form/success message properly:
+
+    <tmpl_if name='change_ok'>
+        <p id="plug_user_login_change_password_ok" class="success-message">Your password has been successfully changed</p>
+    <tmpl_else>
+        <form action="" method="POST" id="plug_user_login_change_password_form">
+        <div>
+            <tmpl_if name='error'>
+                <p class="error"><tmpl_var escape='html' name='error'></p>
+            </tmpl_if>
+            <input type="hidden" name="page" value="<tmpl_var escape='html' name='page'>">
+            <input type="hidden" name="dir" value="<tmpl_var escape='html' name='dir'>">
+            <ul>
+                <li>
+                    <label for="plug_user_login_change_password_pass">Current password: </label
+                    ><input type="password" class="input_password" name="plug_user_login_change_password_pass" id="plug_user_login_change_password_pass">
+                </li>
+                <li>
+                    <label for="plug_user_login_change_password_newpass">New password: </label
+                    ><input type="password" class="input_password" name="plug_user_login_change_password_newpass" id="plug_user_login_change_password_newpass">
+                </li>
+                <li>
+                    <label for="plug_user_login_change_password_repass">Retype new password: </label
+                    ><input type="password" class="input_password" name="plug_user_login_change_password_repass" id="plug_user_login_change_password_repass">
+                </li>
+            </ul>
+            <input type="submit" class="input_submit" name="plug_user_login_change_password_submit" value="Change password">
+        </div>
+        </form>
+    </tmpl_if>
+
+SEE ALSO
+
+L<DBI>, L<App::ZofCMS::Plugin::UserLogin>
+
+
+=head1 App::ZofCMS::Plugin::UserLogin::ForgotPassword (version 0.0112)
+
+NAME
+
+
+Link: L<App::ZofCMS::Plugin::UserLogin::ForgotPassword>
+
+
+
+App::ZofCMS::Plugin::UserLogin::ForgotPassword - addon plugin that adds functionality to let users reset passwords
+
+SYNOPSIS
+
+In your L<HTML::Template> template:
+
+    <tmpl_var name='plug_forgot_password'>
+
+In your Main Config File or ZofCMS Template:
+
+    plugins => [ qw/UserLogin::ForgotPassword/ ],
+
+    plug_user_login_forgot_password => {
+        # mandatory
+        dsn                  => "DBI:mysql:database=test;host=localhost",
+
+        # everything below is optional...
+        # ...arguments' default values are shown
+        user                 => '',
+        pass                 => undef,
+        opt                  => { RaiseError => 1, AutoCommit => 1 },
+        users_table          => 'users',
+        code_table           => 'users_forgot_password',
+        q_code               => 'pulfp_code',
+        max_abuse            => '5:10:60', # 5 min. intervals, max 10 attempts per 60 min.
+        min_pass             => 6,
+        code_expiry          => 24*60*60, # 1 day
+        code_length          => 6,
+        subject              => 'Password Reset',
+        email_link           => undef, # this will be guessed
+        from                 => undef,
+        email_template       => undef, # use plugin's default template
+        create_table         => undef,
+        login_page           => '/',
+        mime_lite_params     => undef,
+        email                => undef, # use `email` column in users table
+        button_send_link => q|<input type="submit" class="input_submit"|
+            . q| value="Send password">|,
+        button_change_pass => q|<input type="submit" class="input_submit"|
+            . q| value="Change password">|,
+        use_stage_indicators => 1,
+        no_run               => undef,
+    },
+
+DESCRIPTION
+
+The module is a plugin for L<App::ZofCMS> that adds functionality to
+L<App::ZofCMS::Plugin::UserLogin> plugin; that being the "forgot password?"
+operations. Namely, this involves showing the user the form to ask for
+their login, emailing the user special link which to follow (this is to
+establish ligitimate reset) and, finally, to provide a form where a user
+can enter their new password (and of course, the plugin will update
+the password in the C<users> table). Wow, a mouthful of functionality! :)
+
+This documentation assumes you've read L<App::ZofCMS>, L<App::ZofCMS::Config> and L<App::ZofCMS::Template>. Whilst not necessary,
+being familiar with L<App::ZofCMS::Plugin::UserLogin> might be helpful.
+
+GENERAL OUTLINE OF THE WAY PLUGIN WORKS
+
+Here's the big picture of what the plugin does: user visits a page, plugin
+shows the HTML form that asks the user to enter their login in order to
+request password reset.
+
+Once the user does that, the plugin checks that the provided login indeed
+exists, checks that there's no abuse going on (flooding with reset
+requests), generates a special "code" that, as part of a full
+link-to-follow, is sent to the user inviting them to click it to proceed
+with the reset.
+
+Once the user clicks the link in their email (and thus ends up back on your
+site), the plugin will invite them to enter (and reenter to confirm)
+their new password. Once the plugin ensures the password looks good,
+it will update user's password in the database.
+
+All this can be enabled on your site with a few keystroke, thanks to this
+plugin :)
+
+FIRST-LEVEL ZofCMS TEMPLATE AND MAIN CONFIG FILE KEYS
+
+C<plugins>
+
+    plugins => [
+        { 'UserLogin::ForgotPassword' => 2000 },
+    ],
+
+B<Mandatory>. You need to include the plugin in the list of plugins
+to execute.
+
+C<plug_user_login_forgot_password>
+
+    plug_user_login_forgot_password => {
+        # mandatory
+        dsn                  => "DBI:mysql:database=test;host=localhost",
+
+        # everything below is optional...
+        # ...arguments' default values are shown
+        user                 => '',
+        pass                 => undef,
+        opt                  => { RaiseError => 1, AutoCommit => 1 },
+        users_table          => 'users',
+        code_table           => 'users_forgot_password',
+        q_code               => 'pulfp_code',
+        max_abuse            => '5:10:60', # 5 min. intervals, max 10 attempts per 60 min.
+        min_pass             => 6,
+        code_expiry          => 24*60*60, # 1 day
+        code_length          => 6,
+        subject              => 'Password Reset',
+        email_link           => undef, # this will be guessed
+        from                 => undef,
+        email_template       => undef, # use plugin's default template
+        create_table         => undef,
+        login_page           => '/',
+        mime_lite_params     => undef,
+        email                => undef, # use `email` column in users table
+        button_send_link => q|<input type="submit" class="input_submit"|
+            . q| value="Send password">|,
+        button_change_pass => q|<input type="submit" class="input_submit"|
+            . q| value="Change password">|,
+        use_stage_indicators => 1,
+        no_run               => undef,
+    },
+
+    # or
+    plug_user_login_forgot_password => sub {
+        my ( $t, $q, $config ) = @_;
+        ...
+        return $hashref_to_assign_to_plug_user_login_forgot_password_key;
+    },
+
+B<Mandatory>. Takes either a hashref or a subref as a value.
+If subref is specified, its return value will be assigned to
+C<plug_user_login_forgot_password> key as if it was already there.
+If sub returns an C<undef>, then plugin will stop further processing.
+The C<@_> of the subref will contain C<$t>, C<$q>, and C<$config>
+(in that order), where C<$t> is ZofCMS Tempalate hashref,
+C<$q> is query parameters hashref, and C<$config> is the
+L<App::ZofCMS::Config> object. The hashref has a whole ton of possible
+keys/values that control plugin's behavior; luckily, virtually all of them
+are optional with sensible defaults. Possible keys/values for the hashref
+are as follows:
+
+C<dsn>
+
+    plug_user_login_forgot_password => {
+        dsn => "DBI:mysql:database=test;host=localhost",
+    ...
+
+B<Mandatory>. The C<dsn> key will be passed to L<DBI>'s
+C<connect_cached()> method, see documentation for L<DBI> and
+C<DBD::your_database> for the correct syntax for this one.
+The example above uses MySQL database called C<test> which is
+located on C<localhost>.
+B<Defaults to:> C<"DBI:mysql:database=test;host=localhost">, which is
+rather useless, so make sure to set your own :)
+
+C<user>
+
+    plug_user_login_forgot_password => {
+        user => '',
+    ...
+
+B<Optional>. Specifies the user name (login) for the database. This can be 
+an empty string if, for example, you are connecting using SQLite 
+driver. B<Defaults to:> C<''> (empty string)
+
+C<pass>
+
+    plug_user_login_forgot_password => {
+        pass => undef,
+    ...
+
+B<Optional>. Same as C<user> except specifies the password for the
+database. B<Defaults to:> C<undef> (no password)
+
+C<opt>
+
+    plug_user_login_forgot_password => {
+        opt => { RaiseError => 1, AutoCommit => 1 },
+    ...
+
+B<Optional>. Will be passed directly to L<DBI>'s C<connect_cached()> method
+as "options". B<Defaults to:> C<< { RaiseError => 1, AutoCommit => 1 } >>
+
+C<users_table>
+
+    plug_user_login_forgot_password => {
+        users_table => 'users',
+    ...
+
+B<Optional>. Specifies the name of the SQL table that you're using
+for storing I<user records>. This would be the
+L<App::ZofCMS::Plugin::UserLogin>'s C<table> argument. If you're not
+using that plugin, your users table should have logins stored in
+C<login> column, passwords in C<password> columns. If you're B<not
+planning to specify> the C<email> argument (see below), your users
+table need to have email addresses specified in the C<email> table column;
+these will be the email addresses to which the reset links will be emailed.
+B<Defaults to:> C<users>
+
+C<code_table>
+
+    plug_user_login_forgot_password => {
+        code_table => 'users_forgot_password',
+    ...
+
+    CREATE TABLE `users_forgot_password` (
+        `login` TEXT,
+        `time`  VARCHAR(10),
+        `code`  TEXT
+    );'
+
+B<Optional>. Specifies the name of SQL table into which to store
+reset codes. This table will be used when user submits password reset
+request, and the added entry will be deleted when user successfully enters
+new password. Above SQL code shows the needed structure of the table,
+but see C<create_table> argument (below) for more on this.
+B<Defaults to:> C<users_forgot_password>
+
+C<create_table>
+
+    plug_user_login_forgot_password => {
+        create_table => undef,
+    ...
+
+B<Optional>. Takes true or false values. When set to a true value,
+the plugin will automatically create the needed table where to store
+reset codes (see C<code_table> above). Note: if the table already exists, 
+plugin will crap out with an error - that's the intended behaviour, simply 
+set C<create_table> back to false value. B<Defaults to:> C<undef>
+
+C<q_code>
+
+    plug_user_login_forgot_password => {
+        q_code => 'pulfp_code',
+    ...
+
+B<Optional>. Takes a scalar as a value that indicates the name of
+the query parameter that will be used by the plugin to reteive the
+"special" code. Plugin uses several query parameter names during its
+operation, but the code is sent via email and is directly visible to
+the user; the idea is that that might give you enough reason to wish
+control the name of that parameter. B<Defaults to:> C<pulfp_code>
+
+C<max_abuse>
+
+    plug_user_login_forgot_password => {
+        max_abuse => '5:10:60', # 5 min. intervals, max 10 attempts per 60 min.
+    ...
+
+    plug_user_login_forgot_password => {
+        max_abuse => undef, # turn off abuse control
+    ...
+
+B<Optional>. B<Defaults to:> C<5:10:60> (5 minute intervals, maximum 10
+attempts per 60 minutes). Takes either C<undef> or specially formatted
+"time code". This argument is responsible for abuse control (yey); abuse
+being the case when an idiot enters some user's login in the reset form and
+then hits browser's REFRESH a billion times, flooding said user. The values
+for this argument are:
+
+C<undef>
+
+    plug_user_login_forgot_password => {
+        max_abuse => undef, # turn off abuse control
+    ...
+
+If set to C<undef>, abuse control will be disabled.
+
+first time code number
+
+    plug_user_login_forgot_password => {
+        max_abuse => '5:10:60',
+    ...
+
+Unless set to C<undef>, the argument's value must be three numbers
+separated by colons. The first number indicates, in minutes, the interval
+of time that must pass after a password reset request until another request
+can be sent I<using the same login> (there's no per-IP protection, or
+anything like that). B<Default first number is> C<5>.
+
+second time code number
+
+The second number indicates the maximum number of reset attempts
+(again, per-login) that can be done in C<third number> interval of time.
+For example, if the second number is 10 and third is 60, a user can request
+password reset 10 times in 60 minutes and no more.
+B<Default second number> is C<10>.
+
+third time code number
+
+The third number indicates, in minutes, the time interval used by the
+second number. B<Default third number is> C<60>.
+
+C<min_pass>
+
+    plug_user_login_forgot_password => {
+        min_pass => 6,
+    ...
+
+B<Optional>. Takes a positive integer as a value. Specifies the minimum
+length (number of characters) for the new password the user provides.
+B<Defaults to:> C<6>
+
+C<code_expiry>
+
+    plug_user_login_forgot_password => {
+        code_expiry => 24*60*60, # 1 day
+    ...
+
+B<Optional>. Takes, in seconds, the time after which to deem the 
+reset code (request) as expired. In other words, if the user requests 
+password reset, then ignores his email for C<code_expiry> seconds, 
+then the link in his email will no longer work, and he would have to 
+request the reset all over again. B<Defaults to:> C<86400> (24 hours)
+
+C<code_length>
+
+    plug_user_login_forgot_password => {
+        code_length => 6,
+    ...
+
+B<Optional>. Specifies the length of the randomly generated code that
+is used to identify legitimate user. Since this code is sent to the
+user via email, and is directly visible, specifying the code to be 
+of too much length will look rather ugly. On the other hand, too short 
+of a code can be easily guessed by a vandal.
+B<Defaults to:> C<6>
+
+C<subject>
+
+    plug_user_login_forgot_password => {
+        subject => 'Password Reset',
+    ...
+
+B<Optional>. Takes a string as a value, this will be used as the subject
+line of the email sent to the user (the one containing the link to click).
+B<Defaults to:> C<Password Reset>
+
+C<from>
+
+    plug_user_login_forgot_password => {
+        from => undef,
+    ...
+
+    plug_user_login_forgot_password => {
+        from => 'Zoffix Znet <zoffix@cpan.org>',
+    ...
+
+B<Optional>. Takes a scalar as a value that specifies the C<From> field for
+your email. If not specified, the plugin will simply not set the C<From>
+argument in L<MIME::Lite>'s C<new()> method (which is what this plugin uses
+under the hood). See L<MIME::Lite>'s docs for more description.
+B<Defaults to:> C<undef> (not specified)
+
+C<email_link>
+
+    plug_user_login_forgot_password => {
+        email_link => undef, # guess the right page
+    ...
+
+    # note how the URI ends with the "invitation" to append the reset
+    # ... code right to the end
+    plug_user_login_forgot_password => {
+        email_link => 'http://foobar.com/your_page?foo=bar&pulfp_code=',
+    ...
+
+B<Optional>. Takes either C<undef> or a string containing a link
+as a value. Specifies the link to the page with this plugin enabled, this
+link will be emailed to the user so that they could proceed to
+enter their new password. When set to C<undef>, the plugin guesses the
+current page (using C<%ENV>) and that's what it will use for the link.
+If you specify the string, make sure to end it with C<pulfp_code=> (note
+the equals sign at the end), where C<pulfp_code> is the value you have set
+for C<q_code> argument. B<Defaults to:> C<undef> (makes the plugin guess
+the right link)
+
+C<email_template>
+
+    plug_user_login_forgot_password => {
+        email_template => undef, # use plugin's default template
+    ...
+
+    plug_user_login_forgot_password => {
+        email_template => \'templates/file.tmpl', # read template from file
+    ...
+
+    plug_user_login_forgot_password => {
+        email_template => '<p>Blah blah blah...', # use this string as template
+    ...
+
+B<Optional>. Takes a scalar, a scalar ref, or C<undef> as a value.
+Specifies L<HTML::Template> template to use when generating the email
+with the reset link. When set to C<undef>, plugin will use its default
+template (see OUTPUT section below). If you're using your own template,
+the C<link> template variable will contain the link the user needs to follow
+(i.e., use C<< <tmpl_var escape='html' name='link'> >>).
+B<Defaults to:> C<undef> (plugin's default, see OUTPUT section below)
+
+C<login_page>
+
+    plug_user_login_forgot_password => {
+        login_page => '/',
+    ...
+
+    plug_user_login_forgot_password => {
+        login_page => '/my-login-page',
+    ...
+
+    plug_user_login_forgot_password => {
+        login_page => 'http://lolwut.com/your-login-page',
+    ...
+
+B<Optional>. As a value, takes either C<undef> or a URI. Once the user is 
+through will all the stuff plugin wants them to do, the plugin will tell 
+them that the password has been changed, and that they can no go ahead
+and "log in". If C<login_page> is specified, the "log in" text will be
+a link pointing to whatever you set in C<login_page>; otherwise, the
+"log in" text will be just plain text. B<Defaults to:> C</> (i.e. web root)
+
+C<mime_lite_params>
+
+    plug_user_login_forgot_password => {
+        mime_lite_params => undef,
+    ...
+
+    plug_user_login_forgot_password => {
+        mime_lite_params => [
+            'smtp',
+            'meowmail',
+            Auth   => [ 'FOO/bar', 'p4ss' ],
+        ],
+    ...
+
+B<Optional>. Takes an arrayref or C<undef> as a value.
+If specified, the arrayref will be directly dereferenced into
+C<< MIME::Lite->send() >>. Here you can set any special send arguments you
+need; see L<MIME::Lite> docs for more info. B<Note:> if the plugin refuses
+to send email, it could well be that you need to set some 
+C<mime_lite_params>; on my box, without anything set, the plugin behaves
+as if everything went through fine, but no email arrives.
+B<Defaults to:> C<undef>
+
+C<email>
+
+    plug_user_login_forgot_password => {
+        email => undef,
+    ...
+
+    plug_user_login_forgot_password => {
+        email => 'foo@bar.com,meow.cans@catfood.com',
+    ...
+
+B<Optional>. Takes either C<undef> or email address(es) as a value.
+This argument tells the plugin where to send the email containing password
+reset link. If set to C<undef>, plugin will look into C<users_table> (see 
+above) and will assume that email address is associated with the user's
+account and is stored in the C<email> column of the C<users_table> table.
+If you don't want that, set the email address directly here. Note: if you
+want to have multiple email addresses, simply separate them with commas.
+B<Defaults to:> C<undef> (take emails from C<users_table> table)
+
+C<button_send_link>
+
+    plug_user_login_forgot_password => {
+        button_send_link => q|<input type="submit" class="input_submit"|
+            . q| value="Send password">|,
+    ...
+
+B<Optional>. Takes HTML code as a value. This code represents the
+submit button in the first form (the one that asks the user to enter
+their login). This, for example, allows you to use image buttons instead
+of regular ones. Also, feel free to use this as the insertion point
+for any extra HTML form you need in this form. B<Defaults to:>
+C<< <input type="submit" class="input_submit" value="Send password"> >>
+
+C<button_change_pass>
+
+    plug_user_login_forgot_password => {
+        button_change_pass => q|<input type="submit" class="input_submit"|
+            . q| value="Change password">|,
+    ...
+
+B<Optional>. Takes HTML code as a value. This code represents the
+submit button in the second form (the one that asks the user to enter
+and reconfirm their new password). This, for example, allows you to use
+image buttons instead of regular ones. Also, feel free to use this as the
+insertion point for any extra HTML form you need in this form.
+B<Defaults to:>
+C<< <input type="submit" class="input_submit" value="Change password"> >>
+
+C<no_run>
+
+    plug_user_login_forgot_password => {
+        no_run => undef,
+    ...
+
+    plug_user_login_forgot_password => {
+        no_run => 1,
+    ...
+
+B<Optional>. Takes either true or false values as a value. This
+argument is a simple control switch that you can use to tell the plugin
+not to execute. If set to a true value, plugin will not run.
+B<Defaults to:> C<undef> (for obvious reasons :))
+
+C<use_stage_indicators>
+
+    plug_user_login_forgot_password => {
+        use_stage_indicators => 1,
+    ...
+
+B<Optional>. Takes either true or false values as a value. When set
+to a true value, plugin will set "stage indicators" (see namesake section 
+below for details); otherwise, it won't set anything. B<Defaults to:> C<1>
+
+STAGE INDICATORS & PLUGIN'S OUTPUT VARIABLE
+
+All of plugin's output is spit out into a single variable in your
+L<HTML::Template> template:
+
+    <tmpl_var name='plug_forgot_password'>
+
+This raises the question of controlling the bells and whistles on your
+page with regard to what stage the plugin is undergoing
+(i.e. is it displaying that form that asks for a login or the one that
+is asking the user for a new password?). This is where I<stage indicators>
+come into play.
+
+Providing C<use_stage_indicators> argument (see above) is set to a true
+value, the plugin will set the key with the name of
+appropriate stage indicator to a true value. That key resides in the
+C<{t}> ZofCMS Template special key, so that you could use it in your
+L<HTML::Template> templates. Possible stage indicators as well as
+explanations of when they are set are as follows:
+
+C<plug_forgot_password_stage_initial>
+
+    <tmpl_if name='plug_forgot_password_stage_initial'>
+        Forgot your pass, huh?
+    </tmpl_if>
+
+This indicator shows that the plugin is in its initial stage; i.e. the
+form asking the user to enter their login is shown.
+
+C<plug_forgot_password_stage_ask_error_login>
+
+    <tmpl_if name='plug_forgot_password_stage_ask_error_login'>
+        Yeah, that ain't gonna work if you don't tell me your login...
+    </tmpl_if>
+
+This indicator will be active if the user submits the form that is
+asking for his login, but does not specify his login.
+
+C<plug_forgot_password_stage_ask_error_no_user>
+
+    <tmpl_if name='plug_forgot_password_stage_ask_error_no_user'>
+        Are you sure you got the right address, bro?
+    </tmpl_if>
+
+This indicator shows that the plugin did not find user's login in the
+C<users_table> table.
+
+C<plug_forgot_password_stage_ask_error_abuse>
+
+    <tmpl_if name='plug_forgot_password_stage_ask_error_abuse'>
+        Give it a rest, idiot!
+    </tmpl_if>
+
+This indicator shows that the plugin detected abuse (see C<max_abuse>
+plugin's argument for details).
+
+C<plug_forgot_password_stage_emailed>
+
+    <tmpl_if name='plug_forgot_password_stage_emailed'>
+        Sent ya an email, dude!
+    </tmpl_if>
+
+This indicator turns on when the plugin successfully sent the user
+an email containing reset pass link.
+
+C<plug_forgot_password_stage_code_invalid>
+
+    <tmpl_if name='plug_forgot_password_stage_code_invalid'>
+        Your reset code has expired, buddy. Hurry up, next time!
+    </tmpl_if>
+
+This indicator is active when the plugin can't find the code the user
+is giving it. Under natural circumstances, this will only occur when
+the code has expired.
+
+C<plug_forgot_password_stage_change_pass_ask>
+
+    <tmpl_if name='plug_forgot_password_stage_change_pass_ask'>
+        What's the new pass you want, buddy?
+    </tmpl_if>
+
+This indicator turns on when the form asking the user for the new password
+is active.
+
+C<plug_forgot_password_stage_code_bad_pass_length>
+
+    <tmpl_if name='plug_forgot_password_stage_code_bad_pass_length'>
+        That pass's too short, dude.
+    </tmpl_if>
+
+This indicator signals that the user attempted to use too short of a new
+password (the length is controlled with the C<min_pass> plugin's argument).
+
+C<plug_forgot_password_stage_code_bad_pass_copy>
+
+    <tmpl_if name='plug_forgot_password_stage_code_bad_pass_copy'>
+        It's really hard to type the same thing twice, ain't it?
+    </tmpl_if>
+
+This indicator turns on if the user did not retype the new password
+correctly.
+
+C<plug_forgot_password_stage_change_pass_done>
+
+    <tmpl_if name='plug_forgot_password_stage_change_pass_done'>
+        Well, looks like you're all done with reseting your pass and what not.
+    </tmpl_if>
+
+This indicator shows that the final stage of plugin's run has been reached;
+i.e. the user has successfully reset the password and can go on with
+their other business.
+
+OUTPUT
+
+The plugin generates a whole bunch of various output; what's below should
+cover all the bases:
+
+Default Email Template
+
+    <h2>Password Reset</h2>
+    
+    <p>Hello. Someone (possibly you) requested a password reset. If that
+    was you, please follow this link to complete the action:
+    <a href="<tmpl_var escape='html' name='link'>"><tmpl_var escape='html'
+    name='link'></a></p>
+    
+    <p>If you did not request anything, simply ignore this email.</p>
+
+You can change this using C<email_template> argument. When using your
+own, use C<< <tmpl_var escape='html' name='link'> >> to insert the
+link the user needs to follow.
+
+"Ask Login" Form Template
+
+    <form action="" method="POST" id="plug_forgot_password_form">
+    <div>
+        <p>Please enter your login into the form below and an email with
+            further instructions will be sent to you.</p>
+    
+        <input type="hidden" name="page" value="<tmpl_var escape='html'
+            name='page'>">
+        <input type="hidden" name="pulfp_ask_link" value="1">
+        <tmpl_if name='error'>
+            <p class="error"><tmpl_var escape='html' name='error'></p>
+        </tmpl_if>
+    
+        <label for="pulfp_login">Your login: </label
+        ><input type="text"
+            class="input_text"
+            name="pulfp_login"
+            id="pulfp_login">
+    
+        <input type="submit"
+            class="input_submit"
+            value="Send password">
+    </div>
+    </form>
+
+This is the form that asks the user for their login in order to reset
+the password. Submit button is plugin's default code, you can control
+it with the C<button_send_link> plugin's argument.
+
+"New Password" Form Template
+
+    <form action="" method="POST" id="plug_forgot_password_new_pass_form">
+    <div>
+        <p>Please enter your new password.</p>
+    
+        <input type="hidden" name="page" value="<tmpl_var escape='html'
+            name='page'>">
+        <input type="hidden" name="<tmpl_var escape='html'
+            name='code_name'>"
+            value="<tmpl_var escape='html' name='code_value'>">
+        <input type="hidden" name="pulfp_has_change_pass" value="1">
+        <tmpl_if name='error'>
+            <p class="error"><tmpl_var escape='html' name='error'></p>
+        </tmpl_if>
+    
+        <ul>
+            <li>
+                <label for="pulfp_pass">New password: </label
+                ><input type="password"
+                    class="input_password"
+                    name="pulfp_pass"
+                    id="pulfp_pass">
+            </li>
+            <li>
+                <label for="pulfp_repass">Retype new password: </label
+                ><input type="password"
+                    class="input_password"
+                    name="pulfp_repass"
+                    id="pulfp_repass">
+            </li>
+        </ul>
+    
+        <input type="submit"
+            class="input_submit"
+            value="Change password">
+    </div>
+    </form>
+
+This is the template for the form that asks the user for their new
+password, as well as the retype of it for confirmation purposes. The code
+for the submit button is what the plugin uses by default
+(see C<button_change_pass> plugin's argument).
+
+"Email Sent" Message
+
+    <p class="reset_link_send_success">Please check your email
+        for further instructions on how to reset your password.</p>
+
+This message is shown when the user enters correct login and the
+plugin successfully sents the user their reset link email.
+
+"Expired Reset Code" Message
+
+    <p class="reset_code_expired">Your reset code has expired. Please try
+        resetting your password again.</p>
+
+This will be shown if the user follows a reset link that contains
+invalid (expired) reset code.
+
+"Changes Successfull" Message
+
+    <p class="reset_pass_success">Your password has been successfully
+        changed. You can now use it to <a href="/">log in</a>.</p>
+
+This will be shown when the plugin has done its business and the password
+has been reset. Note that the "log in" text will only be a link if
+C<login_page> plugin's argument is set; otherwise it will be plain text.
+
+REQUIRED MODUILES
+
+The plugin requires the following modules/versions for healthy operation:
+
+    App::ZofCMS::Plugin::Base  => 0.0105
+    DBI                        => 1.607
+    Digest::MD5                => 2.36_01
+    HTML::Template             => 2.9
+    MIME::Lite                 => 3.027
 
 
 =head1 App::ZofCMS::Plugin::ValidationLinks (version 0.0101)
@@ -7343,7 +13821,7 @@ development server; thus clicking the links from your local version of site will
 the validator error out.
 
 
-=head1 App::ZofCMS::Plugin::YouTube (version 0.0103)
+=head1 App::ZofCMS::Plugin::YouTube (version 0.0104)
 
 NAME
 
@@ -7448,9 +13926,21 @@ C<plug_youtube>
         },
     },
 
+    plug_youtube => sub {
+        my ( $t, $q, $config ) = @_;
+        return {
+            dsn => "DBI:mysql:database=test;host=localhost",
+        }
+    },
+
 The plugin takes its config via C<plug_youtube> first-level key that takes a hashref
-as a value and can be specified in
-either Main Config File or ZofCMS Template or both. If a certain key in that hashref is set
+or a subref as a value and can be specified in
+either Main Config File or ZofCMS Template or both. or a subref as a value. If subref is specified,
+its return value will be assigned to C<plug_youtube> as if it was already there. If sub returns
+an C<undef>, then plugin will stop further processing. The C<@_> of the subref will
+contain (in that order): ZofCMS Tempalate hashref, query parameters hashref and
+L<App::ZofCMS::Config> object.
+If a certain key (does NOT apply to subrefs) in that hashref is set
 in both, Main Config File and ZofCMS Template, the value for that key that is set in
 ZofCMS Template will take precendence. The possible keys/values are as follows (virtually
 all are optional and have default values):
@@ -7708,12 +14198,10 @@ value.
         </li>
     </ul>
 
-
-
 =head1 AUTHOR
 
 'Zoffix, C<< <'zoffix at cpan.org'> >>
-(L<http://zoffix.com/>, L<http://haslayout.net/>, L<http://zofdesign.com/>)
+(L<http://zoffix.com/>, L<http://haslayout.net/>, L<http://mind-power-book.com/>)
 
 =head1 BUGS
 

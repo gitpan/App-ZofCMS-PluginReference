@@ -1,19 +1,21 @@
 ---
-name: App-ZofCMS-PluginReference
-version: 0.0106
+abstract: 'docs for all plugins in one document for easy reference'
 author:
   - "Zoffix <'zoffix@cpan.org'>"
-abstract: docs for all plugins in one document for easy reference
-license: perl
-resources:
-  license: http://dev.perl.org/licenses/
 build_requires:
   Test::More: 0
-provides:
-  App::ZofCMS::PluginReference:
-    file: lib/App/ZofCMS/PluginReference.pm
-    version: 0.0106
-generated_by: Module::Build version 0.33
+configure_requires:
+  Module::Build: 0.36
+generated_by: 'Module::Build version 0.3607'
+license: perl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
   version: 1.4
+name: App-ZofCMS-PluginReference
+provides:
+  App::ZofCMS::PluginReference:
+    file: lib/App/ZofCMS/PluginReference.pm
+    version: 0.0107
+resources:
+  license: http://dev.perl.org/licenses/
+version: 0.0107
